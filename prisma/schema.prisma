@@ -1,13 +1,355 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  PATIENT
+  DOCTOR
+  PHARMACY
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Vertical {
+  ED
+  WEIGHT_LOSS
+}
+
+enum AccountStatus {
+  PENDING_INTAKE
+  PENDING_CONSULT
+  ACTIVE
+  PAUSED
+  SUSPENDED
+  CANCELLED
+  INELIGIBLE
+}
+
+enum EligibilityResult {
+  ELIGIBLE
+  EXCLUDED
+  PENDING
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  ACKNOWLEDGED
+  PACKED
+  DISPATCHED
+  DELIVERED
+  FAILED
+}
+
+enum LogisticsPartner {
+  GIG
+  KWIK
+  SENDBOX
+  OTHER
+}
+
+enum PlanCode {
+  ED_BASIC
+  ED_STANDARD
+  ED_PREMIUM
+  WL_STARTER
+  WL_CORE
+  WL_VIP
+}
+
+enum ConsultMode {
+  ASYNC
+  VIDEO
+}
+
+enum MessageSender {
+  PATIENT
+  DOCTOR
+  SYSTEM
+}
+
+// Users (single auth table for all roles)
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  phone         String?
+  password      String
+  role          UserRole       @default(PATIENT)
+  isActive      Boolean        @default(true)
+  mfaSecret     String? // TOTP for doctor/admin roles
+  mfaEnabled    Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  lastLoginAt   DateTime?
+  refreshTokens RefreshToken[]
+  patient       Patient?
+  doctor        Doctor?
+  pharmacist    Pharmacist?
+  auditLogs     AuditLog[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique // SHA-256 hash of the raw token
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Patient
+model Patient {
+  id               String          @id @default(uuid())
+  userId           String          @unique
+  // Encrypted PII (AES-256-GCM, stored as base64 ciphertext:iv:tag)
+  firstName        String
+  lastName         String
+  gender           String
+  dob              DateTime
+  address          String
+  stateOfResidence String // NOT encrypted - used for routing/filtering
+  ndprConsentAt    DateTime
+  marketingOptIn   Boolean         @default(false)
+  accountStatus    AccountStatus   @default(PENDING_INTAKE)
+  subscriptions    Subscription[]
+  intakes          Intake[]
+  messages         Message[]
+  progressEntries  ProgressEntry[]
+  user             User            @relation(fields: [userId], references: [id])
+  prescriptions    Prescription[]
+
+  @@index([accountStatus])
+}
+
+// Doctor
+model Doctor {
+  id               String         @id @default(uuid())
+  userId           String         @unique
+  fullName         String
+  mdcnRegistration String         @unique
+  specialisation   String?
+  isAvailable      Boolean        @default(true)
+  maxOpenConsults  Int            @default(25)
+  availability     String // JSON: { mon:[{start:'09:00',end:'17:00'}], ... }
+  user             User           @relation(fields: [userId], references: [id])
+  prescriptions    Prescription[]
+  messages         Message[]
+  intakeReviews    Intake[]       @relation("ReviewedBy")
+  videoSlots       VideoSlot[]
+}
+
+// Pharmacist
+model Pharmacist {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  pharmacyId String
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Pharmacy {
+  id          String       @id @default(uuid())
+  name        String
+  pcnLicence  String       @unique
+  canCompound Boolean      @default(false)
+  cities      String // JSON array of service cities
+  isActive    Boolean      @default(true)
+  pharmacists Pharmacist[]
+  orders      Order[]
+}
+
+// Subscription
+model Subscription {
+  id                       String         @id @default(uuid())
+  patientId                String
+  vertical                 Vertical
+  planCode                 PlanCode
+  status                   AccountStatus
+  paystackSubscriptionCode String?        @unique
+  paystackCustomerCode     String?
+  amount                   Int // Store in kobo, display as Naira
+  billingDay               Int // 1-28
+  nextBillingDate          DateTime?
+  nextRefillDate           DateTime?
+  pausedUntil              DateTime?
+  createdAt                DateTime       @default(now())
+  cancelledAt              DateTime?
+  patient                  Patient        @relation(fields: [patientId], references: [id])
+  intakes                  Intake[]
+  prescriptions            Prescription[]
+  orders                   Order[]
+  paymentEvents            PaymentEvent[]
+
+  @@index([patientId, status])
+}
+
+// Intake
+model Intake {
+  id             String            @id @default(uuid())
+  patientId      String
+  subscriptionId String?
+  vertical       Vertical
+  formVersion    String // e.g. '1.0.0' - bump on exclusion rule changes
+  responsesEnc   String // JSON stringified then AES-256-GCM encrypted
+  clinicalFlags  String? // JSON array of triggered exclusion codes
+  eligibility    EligibilityResult @default(PENDING)
+  status         String            @default("draft") // draft|submitted|reviewed
+  submittedAt    DateTime?
+  reviewedAt     DateTime?
+  reviewedById   String?
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  subscription   Subscription?     @relation(fields: [subscriptionId], references: [id])
+  reviewedBy     Doctor?           @relation("ReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([patientId, vertical, status])
+}
+
+// Prescription
+model Prescription {
+  id             String             @id @default(uuid())
+  patientId      String
+  doctorId       String
+  subscriptionId String
+  drugName       String
+  doseMg         Decimal
+  frequency      String
+  quantity       Int
+  refillsAuth    Int
+  refillsUsed    Int                @default(0)
+  status         PrescriptionStatus @default(ACTIVE)
+  issuedAt       DateTime           @default(now())
+  expiresAt      DateTime
+  pdfUrl         String?
+  pdfHash        String? // SHA-256 of PDF content for integrity
+  digitalSig     String // SHA-256(patientId+doctorId+drugName+dose+issuedAt)
+  patient        Patient            @relation(fields: [patientId], references: [id])
+  doctor         Doctor             @relation(fields: [doctorId], references: [id])
+  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
+  orders         Order[]
+
+  @@index([patientId, status])
+  @@index([subscriptionId])
+}
+
+// Order
+model Order {
+  id               String            @id @default(uuid())
+  patientId        String
+  prescriptionId   String
+  subscriptionId   String
+  pharmacyId       String
+  status           OrderStatus       @default(PENDING)
+  deliveryAddrEnc  String // Snapshot of address at order time, encrypted
+  logisticsPartner LogisticsPartner?
+  trackingNumber   String?
+  coldChain        Boolean           @default(false)
+  isDiscreet       Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  acknowledgedAt   DateTime?
+  packedAt         DateTime?
+  dispatchedAt     DateTime?
+  estDeliveryDate  DateTime?
+  deliveredAt      DateTime?
+  pharmacyNotes    String?
+  prescription     Prescription      @relation(fields: [prescriptionId], references: [id])
+  subscription     Subscription      @relation(fields: [subscriptionId], references: [id])
+  pharmacy         Pharmacy          @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, status])
+  @@index([patientId, status])
+}
+
+// Messaging
+model Message {
+  id         String        @id @default(uuid())
+  patientId  String
+  doctorId   String?
+  sender     MessageSender
+  contentEnc String // AES-256-GCM encrypted
+  mediaUrl   String? // S3 URL for image attachments
+  mediaType  String? // 'image/jpeg' | 'image/png'
+  isRead     Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  patient    Patient       @relation(fields: [patientId], references: [id])
+  doctor     Doctor?       @relation(fields: [doctorId], references: [id])
+
+  @@index([patientId, createdAt])
+  @@index([doctorId, isRead])
+}
+
+// Progress (weight loss only)
+model ProgressEntry {
+  id         String   @id @default(uuid())
+  patientId  String
+  weightKg   Decimal
+  photoUrl   String? // S3 URL, optional
+  notes      String?
+  recordedAt DateTime @default(now())
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  @@index([patientId, recordedAt])
+}
+
+// Video Slots (weight loss consultations)
+model VideoSlot {
+  id           String    @id @default(uuid())
+  doctorId     String
+  patientId    String?
+  startTime    DateTime
+  endTime      DateTime
+  wherebyUrl   String? // Set when patient books
+  isBooked     Boolean   @default(false)
+  completedAt  DateTime?
+  consultNotes String? // Doctor fills post-session
+  doctor       Doctor    @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, startTime])
+  @@index([isBooked, startTime])
+}
+
+// Payment Events
+model PaymentEvent {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  paystackRef    String       @unique
+  event          String // 'charge.success' | 'charge.failed' | etc.
+  amount         Int
+  payload        String // Raw Paystack webhook JSON
+  processedAt    DateTime     @default(now())
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+}
+
+// Audit Log (immutable)
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String // 'PRESCRIPTION_ISSUED' | 'PATIENT_DATA_ACCESSED' | etc.
+  entityType String // 'Prescription' | 'Patient' | 'Order'
+  entityId   String
+  ipAddress  String?
+  userAgent  String?
+  metadata   String? // JSON extra context
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
 }
