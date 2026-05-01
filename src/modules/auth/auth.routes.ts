@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { AuthController } from "./auth.controller.js";
 import { ErrorMiddleware } from "../../middleware/errorHandler.js";
+import { AuthMiddleware } from "../../middleware/protect.js";
 import { registerSchema, loginSchema } from "./auth.schema.js";
 
 const router: IRouter = Router();
@@ -18,14 +19,16 @@ router.post(
   authController.login
 );
 
-router.post(
-  "/refresh",
-  authController.refresh
-);
+// Email Verification
+router.post("/verify-email/:token", authController.verifyEmail);
+router.post("/resend-verification", AuthMiddleware.protect, authController.resendVerification);
 
-router.post(
-  "/logout",
-  authController.logout
-);
+// Password Reset
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password/:token", authController.resetPassword);
+
+// Session Management
+router.post("/refresh", authController.refresh);
+router.post("/logout", authController.logout);
 
 export default router;

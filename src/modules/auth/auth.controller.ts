@@ -55,6 +55,61 @@ export class AuthController {
     }
   }
 
+  // Verify email
+  async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      if (!token || typeof token !== "string") {
+        throw new AppError("Verification token is required and must be a string", 400);
+      }
+
+      const result = await authService.verifyEmail(token);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Resend verification
+  async resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new AppError("User not authenticated", 401);
+      const result = await authService.resendVerification(req.user.id);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Forgot password
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email) throw new AppError("Email is required", 400);
+
+      const result = await authService.forgotPassword(email);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Reset password
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { password } = req.body;
+      if (!token || typeof token !== "string" || !password) {
+        throw new AppError("Token and password are required", 400);
+      }
+
+      const result = await authService.resetPassword(token, password);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Refresh access token
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
