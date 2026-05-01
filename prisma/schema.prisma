@@ -1,13 +1,74 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum AccountStatus {
+  PENDING_INTAKE
+  PENDING_CONSULT
+  ACTIVE
+  PAUSED
+  SUSPENDED
+  CANCELLED
+  INELIGIBLE
+}
+
+enum EligibilityResult {
+  ELIGIBLE
+  EXCLUDED
+  PENDING
+}
+
+enum Vertical {
+  ED
+  WEIGHT_LOSS
+}
+
+// Mock User for relations since auth was deleted
+model User {
+  id      String    @id @default(uuid()) @db.Uuid
+  patient Patient?
+}
+
+model Patient {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @unique @db.Uuid
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullNameEnc      String
+  dobEnc           String
+  addressEnc       String
+  stateOfResidence String
+  ndprConsentAt    DateTime?
+  marketingOptIn   Boolean       @default(false)
+  accountStatus    AccountStatus @default(PENDING_INTAKE)
+  
+  intakes          Intake[]
+}
+
+model Intake {
+  id               String            @id @default(uuid()) @db.Uuid
+  patientId        String            @db.Uuid
+  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  subscriptionId   String?           @db.Uuid
+  vertical         Vertical
+  formVersion      String
+  responsesEnc     String
+  clinicalFlags    Json              @default("[]")
+  eligibility      EligibilityResult @default(PENDING)
+  status           String            @default("draft") // draft, submitted, reviewed
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedById     String?           @db.Uuid
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  action      String   // INTAKE_SUBMITTED, INTAKE_UNLOCKED, PATIENT_PROFILE_CREATED
+  description String?
+  userId      String?  @db.Uuid
+  entityId    String?  @db.Uuid
+  createdAt   DateTime @default(now())
 }
