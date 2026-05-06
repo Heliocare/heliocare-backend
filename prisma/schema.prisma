@@ -120,18 +120,27 @@ model User {
   phone         String?
   password      String
   role          UserRole       @default(PATIENT)
-  isActive      Boolean        @default(true)
-  mfaSecret     String? // TOTP for doctor/admin roles
-  mfaEnabled    Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  lastLoginAt   DateTime?
-  refreshTokens RefreshToken[]
-  patient       Patient?
-  doctor        Doctor?
-  pharmacist    Pharmacist?
-  auditLogs     AuditLog[]
+  isActive                 Boolean        @default(true)
+  isEmailVerified          Boolean        @default(false)
+  emailVerificationToken   String?        @unique
+  emailVerificationExpires DateTime?
+  passwordResetToken       String?        @unique
+  passwordResetExpires     DateTime?
+  failedLoginAttempts      Int            @default(0)
+  lockUntil                DateTime?
+  mfaSecret                String? // TOTP for doctor/admin roles
+  mfaEnabled               Boolean        @default(false)
+  createdAt                DateTime       @default(now())
+  lastLoginAt              DateTime?
+  refreshTokens            RefreshToken[]
+  patient                  Patient?
+  doctor                   Doctor?
+  pharmacist               Pharmacist?
+  auditLogs                AuditLog[]
 
   @@index([email])
+  @@index([emailVerificationToken])
+  @@index([passwordResetToken])
 }
 
 model RefreshToken {

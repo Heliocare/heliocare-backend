@@ -33,7 +33,11 @@ import type { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { errorHandler } from "./middleware/errorHandler.js";
+import cookieParser from "cookie-parser";
+import authRoutes from "./modules/auth/auth.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
+import messageRoutes from "./modules/messaging/message.routes.js";
+import { ErrorMiddleware } from "./middleware/errorHandler.js";
 
 const app: Application = express();
 
@@ -60,6 +64,7 @@ app.use(limiter);
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(process.env.COOKIE_SECRET));
 
 // Health Check Route
 app.get("/health", (_req: Request, res: Response) => {
@@ -70,7 +75,12 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("Heliocare Backend API is running.");
 });
 
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/messages", messageRoutes);
+
 // Global Error Handler
-app.use(errorHandler);
+app.use(ErrorMiddleware.handle);
 
 export default app;
