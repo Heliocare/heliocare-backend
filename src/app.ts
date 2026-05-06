@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import messageRoutes from "./modules/messaging/message.routes.js";
 import { ErrorMiddleware } from "./middleware/errorHandler.js";
 
 const app: Application = express();
@@ -47,6 +48,7 @@ app.get("/", (_req: Request, res: Response) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/messages", messageRoutes);
 
 // Global Error Handler
 app.use(ErrorMiddleware.handle);

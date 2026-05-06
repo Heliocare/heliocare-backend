@@ -1,21 +1,28 @@
 import "dotenv/config";
+import http from "node:http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { Database } from "./lib/prisma.js";
+import { SocketServer } from "./lib/socket.js";
 
 // Application server manager
 class Server {
   private readonly port: number | string;
-  private server: ReturnType<typeof app.listen> | null = null;
+  private server: http.Server | null = null;
 
   constructor() {
-    this.port = process.env.PORT as string
+    this.port = process.env.PORT as any
   }
 
-  // Start the HTTP server
+  // Start the server
   start(): void {
-    this.server = app.listen(this.port, () => {
-      logger.info(`Server is running on port ${this.port}`);
+    const httpServer = http.createServer(app);
+
+    // Initialize Sockets
+    SocketServer.init(httpServer);
+
+    this.server = httpServer.listen(this.port, () => {
+      logger.info(`Server is running on port ${this.port} (HTTP & WebSockets)`);
     });
 
     this.registerShutdownHandlers();
