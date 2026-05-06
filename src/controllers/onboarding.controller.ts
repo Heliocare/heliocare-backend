@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma/client.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { encryptObject, encryptString } from "../lib/crypto/fieldEncrypt.js";
+import { sendVerifyEmail } from "../lib/notifications/index.js";
 
 const profileSchema = z.object({
     fullName: z.string().min(1),
@@ -49,6 +50,11 @@ export const OnboardingController = {
                     entityId: patient.id
                 }
             });
+
+            // TODO: Fetch real email from Auth/User service, using dummy for now
+            const patientEmail = "patient@example.com";
+            const verificationUrl = `https://vitaehealth.ng/verify?token=${patient.id}`;
+            sendVerifyEmail(patientEmail, verificationUrl).catch(() => { });
 
             sendSuccess(res, { patientId: patient.id }, 201);
         } catch (e) {

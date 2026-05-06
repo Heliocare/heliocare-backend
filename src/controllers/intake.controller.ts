@@ -4,6 +4,7 @@ import { prisma } from "../prisma/client.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { encryptObject, decryptObject } from "../lib/crypto/fieldEncrypt.js";
 import { evaluateExclusions } from "../lib/clinical/exclusions.js";
+import { notifyIntakeApproved, notifyIntakeExcluded } from "../lib/notifications/index.js";
 
 const startSchema = z.object({
     vertical: z.enum(["ED", "WEIGHT_LOSS"])
@@ -98,6 +99,15 @@ export const IntakeController = {
             await prisma.auditLog.create({
                 data: { action: "INTAKE_SUBMITTED", userId: req.user!.id, entityId: intake.id }
             });
+
+            // TODO: Fetch real phone from user service or patient profile, using dummy for now
+            const patientPhone = "+2348000000000";
+
+            if (eligibility === "ELIGIBLE") {
+                notifyIntakeApproved(patientPhone).catch(() => { });
+            } else if (eligibility === "EXCLUDED") {
+                notifyIntakeExcluded(patientPhone).catch(() => { });
+            }
 
             sendSuccess(res, { eligibility, exclusionCodes: allFlags });
         } catch (e) { next(e); }
