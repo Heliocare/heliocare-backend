@@ -1,42 +1,17 @@
 import express from "express";
-import type { Request, Response, NextFunction } from "express";
-import onboardingRoutes from "./routes/onboarding.routes.js";
-import intakeRoutes from "./routes/intake.routes.js";
-
-const app = express();
-
-app.use(express.json());
-
-app.get("/", (_req: Request, res: Response) => {
-    res.send("Vitae Health Intake & Onboarding API");
-});
-
-app.use("/api/v1/onboarding", onboardingRoutes);
-app.use("/api/v1/intake", intakeRoutes);
-
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    console.error(err);
-    res.status(err.status || 500).json({
-        success: false,
-        error: {
-            code: err.code || "INTERNAL_SERVER_ERROR",
-            message: err.message || "An internal error occurred"
-        }
-    });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
 import type { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+
+// Route imports
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
-import messageRoutes from "./modules/messaging/message.routes.js";
+import messageRoutes from "./modules/messages/message.routes.js";
+import onboardingRoutes from "./modules/onboarding/onboarding.routes.js";
+import intakeRoutes from "./modules/intake/intake.routes.js";
+
 import { ErrorMiddleware } from "./middleware/errorHandler.js";
 
 const app: Application = express();
@@ -44,7 +19,7 @@ const app: Application = express();
 // Security Middleware
 app.use(helmet());
 
-// CORS configuration based on user constraints
+// CORS configuration
 app.use(
   cors({
     origin: ["http://localhost:3000", "http://localhost:5173"],
@@ -52,7 +27,7 @@ app.use(
   })
 );
 
-// Rate Limiting (100 requests per 15 minutes)
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
@@ -66,7 +41,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// Health Check Route
+// Health Check
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
@@ -79,6 +54,8 @@ app.get("/", (_req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/onboarding", onboardingRoutes);
+app.use("/api/intake", intakeRoutes);
 
 // Global Error Handler
 app.use(ErrorMiddleware.handle);

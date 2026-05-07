@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "node:http";
 import { logger } from "./logger.js";
 import { JWT } from "../utils/jwt.js";
-import { MessageService } from "../modules/messaging/message.service.js";
+import { MessageService } from "../modules/messages/message.service.js";
 
 const messageService = new MessageService();
 
@@ -20,7 +20,7 @@ export class SocketServer {
     // Authentication Middleware for Sockets
     this.io.use((socket, next) => {
       const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(" ")[1];
-      
+
       if (!token) {
         return next(new Error("Authentication error: Token missing"));
       }
@@ -52,7 +52,7 @@ export class SocketServer {
       socket.on("send_message", async (data: { patientId: string; doctorId: string; content: string }) => {
         try {
           const roomName = `chat_${data.patientId}_${data.doctorId}`;
-          
+
           // Save to DB (Encrypted)
           const savedMsg = await messageService.saveMessage(user.userId, user.role as "PATIENT" | "DOCTOR", {
             patientId: data.patientId,
@@ -62,7 +62,7 @@ export class SocketServer {
 
           // Emit to the room (Decrypted for participants)
           this.io.to(roomName).emit("receive_message", savedMsg);
-          
+
           // Also emit a notification to the recipient's personal room
           const recipientId = user.role === "PATIENT" ? data.doctorId : data.patientId;
           this.io.to(recipientId).emit("new_message_notification", {

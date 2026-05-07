@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { sendError } from "../utils/response.js";
-import { prisma } from "../prisma/client.js";
+import { prisma } from "../../prisma/client.js";
 
 export interface JwtPayload {
     id: string;

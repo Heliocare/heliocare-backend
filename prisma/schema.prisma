@@ -1,9 +1,24 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  PATIENT
+  DOCTOR
+  PHARMACY
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Vertical {
+  ED
+  WEIGHT_LOSS
 }
 
 enum AccountStatus {
@@ -22,55 +37,6 @@ enum EligibilityResult {
   PENDING
 }
 
-enum Vertical {
-  ED
-  WEIGHT_LOSS
-}
-
-// Mock User for relations since auth was deleted
-model User {
-  id      String    @id @default(uuid()) @db.Uuid
-  patient Patient?
-}
-
-model Patient {
-  id               String        @id @default(uuid()) @db.Uuid
-  userId           String        @unique @db.Uuid
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullNameEnc      String
-  dobEnc           String
-  addressEnc       String
-  stateOfResidence String
-  ndprConsentAt    DateTime?
-  marketingOptIn   Boolean       @default(false)
-  accountStatus    AccountStatus @default(PENDING_INTAKE)
-  
-  intakes          Intake[]
-}
-
-model Intake {
-  id               String            @id @default(uuid()) @db.Uuid
-  patientId        String            @db.Uuid
-  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  subscriptionId   String?           @db.Uuid
-  vertical         Vertical
-  formVersion      String
-  responsesEnc     String
-  clinicalFlags    Json              @default("[]")
-  eligibility      EligibilityResult @default(PENDING)
-  status           String            @default("draft") // draft, submitted, reviewed
-  submittedAt      DateTime?
-  reviewedAt       DateTime?
-  reviewedById     String?           @db.Uuid
-}
-
-model AuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  action      String   // INTAKE_SUBMITTED, INTAKE_UNLOCKED, PATIENT_PROFILE_CREATED
-  description String?
-  userId      String?  @db.Uuid
-  entityId    String?  @db.Uuid
-  createdAt   DateTime @default(now())
 enum PrescriptionStatus {
   ACTIVE
   EXPIRED
@@ -115,11 +81,11 @@ enum MessageSender {
 
 // Users (single auth table for all roles)
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  phone         String?
-  password      String
-  role          UserRole       @default(PATIENT)
+  id                       String         @id @default(uuid())
+  email                    String         @unique
+  phone                    String?
+  password                 String
+  role                     UserRole       @default(PATIENT)
   isActive                 Boolean        @default(true)
   isEmailVerified          Boolean        @default(false)
   emailVerificationToken   String?        @unique
@@ -167,7 +133,7 @@ model Patient {
   dob              DateTime
   address          String
   stateOfResidence String // NOT encrypted - used for routing/filtering
-  ndprConsentAt    DateTime
+  ndprConsentAt    DateTime?
   marketingOptIn   Boolean         @default(false)
   accountStatus    AccountStatus   @default(PENDING_INTAKE)
   subscriptions    Subscription[]
@@ -383,15 +349,15 @@ model PaymentEvent {
 // Audit Log (immutable)
 model AuditLog {
   id         String   @id @default(uuid())
-  userId     String
+  userId     String?
   action     String // 'PRESCRIPTION_ISSUED' | 'PATIENT_DATA_ACCESSED' | etc.
-  entityType String // 'Prescription' | 'Patient' | 'Order'
-  entityId   String
+  entityType String? // 'Prescription' | 'Patient' | 'Order'
+  entityId   String?
   ipAddress  String?
   userAgent  String?
   metadata   String? // JSON extra context
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@index([entityType, entityId])
