@@ -8,7 +8,6 @@ import cookieParser from "cookie-parser";
 // Route imports
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
-import messageRoutes from "./modules/messages/message.routes.js";
 import onboardingRoutes from "./modules/onboarding/onboarding.routes.js";
 import intakeRoutes from "./modules/intake/intake.routes.js";
 
@@ -53,7 +52,6 @@ app.get("/", (_req: Request, res: Response) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/messages", messageRoutes);
 app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/intake", intakeRoutes);
 

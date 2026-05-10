@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { sendError } from "../utils/response.js";
-import { prisma } from "../../prisma/client.js";
+import { prisma } from "../lib/prisma.js";
 
 export interface JwtPayload {
     id: string;
@@ -32,9 +32,10 @@ export const verifyAccessToken = async (req: Request, res: Response, next: NextF
     const role = parts[1];
 
     try {
-        let user = await prisma.user.findUnique({ where: { id } });
+        const user = await prisma.user.findUnique({ where: { id } });
         if (!user) {
-            user = await prisma.user.create({ data: { id } });
+            sendError(res, "User not found in database", "UNAUTHORIZED", 401);
+            return;
         }
         req.user = { id: user.id, role };
         next();

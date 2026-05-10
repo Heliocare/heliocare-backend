@@ -33,6 +33,6 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "prisma/client.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

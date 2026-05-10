@@ -73,12 +73,6 @@ enum ConsultMode {
   VIDEO
 }
 
-enum MessageSender {
-  PATIENT
-  DOCTOR
-  SYSTEM
-}
-
 // Users (single auth table for all roles)
 model User {
   id                       String         @id @default(uuid())
@@ -138,7 +132,6 @@ model Patient {
   accountStatus    AccountStatus   @default(PENDING_INTAKE)
   subscriptions    Subscription[]
   intakes          Intake[]
-  messages         Message[]
   progressEntries  ProgressEntry[]
   user             User            @relation(fields: [userId], references: [id])
   prescriptions    Prescription[]
@@ -158,7 +151,6 @@ model Doctor {
   availability     String // JSON: { mon:[{start:'09:00',end:'17:00'}], ... }
   user             User           @relation(fields: [userId], references: [id])
   prescriptions    Prescription[]
-  messages         Message[]
   intakeReviews    Intake[]       @relation("ReviewedBy")
   videoSlots       VideoSlot[]
 }
@@ -282,24 +274,6 @@ model Order {
 
   @@index([pharmacyId, status])
   @@index([patientId, status])
-}
-
-// Messaging
-model Message {
-  id         String        @id @default(uuid())
-  patientId  String
-  doctorId   String?
-  sender     MessageSender
-  contentEnc String // AES-256-GCM encrypted
-  mediaUrl   String? // S3 URL for image attachments
-  mediaType  String? // 'image/jpeg' | 'image/png'
-  isRead     Boolean       @default(false)
-  createdAt  DateTime      @default(now())
-  patient    Patient       @relation(fields: [patientId], references: [id])
-  doctor     Doctor?       @relation(fields: [doctorId], references: [id])
-
-  @@index([patientId, createdAt])
-  @@index([doctorId, isRead])
 }
 
 // Progress (weight loss only)
