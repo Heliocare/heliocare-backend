@@ -100,7 +100,7 @@ export class AuthService {
       // Increment failed attempts
       const attempts = user.failedLoginAttempts + 1;
       const isLocking = attempts >= 10;
-      
+
       await prisma.user.update({
         where: { id: user.id },
         data: {
