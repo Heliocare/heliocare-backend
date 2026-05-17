@@ -8,5 +8,7 @@ const adminController = new AdminController();
 router.use(AuthMiddleware.protect, AuthMiddleware.restrictTo("ADMIN", "SUPER_ADMIN"));
 
 router.post("/invite", adminController.inviteUser);
+router.get("/professionals/pending", adminController.getPendingProfessionals);
+router.patch("/professionals/:id/approve", adminController.approveProfessional);
 
 export default router;

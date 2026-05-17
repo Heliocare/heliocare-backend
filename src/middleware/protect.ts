@@ -55,4 +55,24 @@ export class AuthMiddleware {
       next();
     };
   }
+
+  // Enforce MFA for specific roles (Mandatory for Professionals)
+  static async requireMfa(req: Request, _res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new AppError("Authentication required", 401);
+
+      const isProfessional = ["DOCTOR", "PHARMACIST", "LAB_SCIENTIST", "DIETITIAN", "ADMIN", "SUPER_ADMIN"].includes(req.user.role);
+      
+      if (isProfessional) {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (user && !user.mfaEnabled) {
+          throw new AppError("Multi-factor authentication is mandatory for your role. Please set up MFA to continue.", 403, "MFA_REQUIRED");
+        }
+      }
+      
+      next();
+    } catch (error) {
+      next(error);
+    }
+  }
 }

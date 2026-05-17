@@ -14,9 +14,11 @@ export class JWT {
     return jwt.sign(payload, this.ACCESS_SECRET, { expiresIn: "15m" });
   }
 
-  // Signs a refresh token (long-lived: 7d).
+  // Signs a refresh token (Role-aware: 24h for Professionals, 7d for Patients).
   static signRefresh(payload: TokenPayload): string {
-    return jwt.sign(payload, this.REFRESH_SECRET, { expiresIn: "7d" });
+    const isProfessional = ["DOCTOR", "PHARMACIST", "LAB_SCIENTIST", "DIETITIAN", "ADMIN", "SUPER_ADMIN"].includes(payload.role);
+    const expiresIn = isProfessional ? "24h" : "7d";
+    return jwt.sign(payload, this.REFRESH_SECRET, { expiresIn });
   }
 
   // Verifies an access token.

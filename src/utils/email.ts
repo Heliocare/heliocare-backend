@@ -42,6 +42,40 @@ export class Email {
   }
 
   /**
+   * Sends an invitation email to a new professional staff member
+   */
+  static async sendInvitationEmail(to: string, token: string): Promise<void> {
+    const url = `${process.env.FRONTEND_URL || "http://localhost:3000"}/activate?token=${token}`;
+    const subject = "Invitation to join Heliocare";
+    const text = `You have been invited to join the Heliocare clinical team. Please click the link below to set up your account:\n\n${url}`;
+    const html = `
+      <h1>Join the Heliocare Team</h1>
+      <p>You have been invited to join the clinical team. Click the button below to set up your password and complete your profile. This link expires in 48 hours.</p>
+      <a href="${url}" style="padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Set Up Account</a>
+      <p>Or copy this link: ${url}</p>
+    `;
+
+    await this.send(to, subject, text, html);
+  }
+
+  /**
+   * Sends an account unlock email
+   */
+  static async sendUnlockAccountEmail(to: string, token: string): Promise<void> {
+    const url = `${process.env.FRONTEND_URL || "http://localhost:3000"}/unlock-account?token=${token}`;
+    const subject = "Unlock your Heliocare account";
+    const text = `Your account has been locked due to multiple failed login attempts. Click the link below to unlock it:\n\n${url}`;
+    const html = `
+      <h1>Unlock Your Account</h1>
+      <p>Your account was locked for security. Click the button below to restore access:</p>
+      <a href="${url}" style="padding: 10px 20px; background-color: #ffc107; color: black; text-decoration: none; border-radius: 5px;">Unlock Account</a>
+      <p>Or copy this link: ${url}</p>
+    `;
+
+    await this.send(to, subject, text, html);
+  }
+
+  /**
    * Internal method to handle the actual sending logic
    */
   private static async send(to: string, subject: string, text: string, html: string): Promise<void> {
@@ -74,7 +108,6 @@ export class Email {
       logger.info(`Email sent successfully to ${to}`);
     } catch (error) {
       logger.error({ error }, `Failed to send email to ${to}`);
-      // We don't throw here to avoid crashing the request, but we log it
     }
   }
 }
