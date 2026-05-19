@@ -295,3 +295,78 @@
  *       400:
  *         description: Invalid or expired token
  */
+
+/**
+ * @swagger
+ * /api/auth/activate:
+ *   post:
+ *     summary: Activate invited professional/staff account
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token: { type: string, description: "Activation token received from invite email" }
+ *               password: { type: string, format: password, example: "Password123!" }
+ *     responses:
+ *       200:
+ *         description: Account activated successfully
+ *       400:
+ *         description: Invalid or expired token, or weak password
+ */
+
+/**
+ * @swagger
+ * /api/auth/mfa/setup:
+ *   post:
+ *     summary: Generate MFA TOTP secret (MFA setup step 1)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Secret generated. Returns TOTP secret and provisioning URI.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     secret: { type: string }
+ *                     otpauthUrl: { type: string }
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /api/auth/mfa/enable:
+ *   post:
+ *     summary: Verify TOTP token and enable MFA (MFA setup step 2)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string, example: "123456", description: "6-digit TOTP code" }
+ *     responses:
+ *       200:
+ *         description: MFA successfully enabled
+ *       400:
+ *         description: Invalid or missing token
+ *       401:
+ *         description: Invalid MFA token or Unauthorized
+ */

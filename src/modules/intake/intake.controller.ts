@@ -5,9 +5,7 @@ import { Crypto } from "../../utils/crypto.js";
 import { evaluateExclusions } from "../../lib/clinical/exclusions.js";
 
 export class IntakeController {
-  /**
-   * Initialize a new medical intake session.
-   */
+  // Initialize a new medical intake session.
   async start(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { vertical } = req.body;
@@ -51,9 +49,7 @@ export class IntakeController {
     }
   }
 
-  /**
-   * Save a step's worth of responses (with E2E encryption).
-   */
+  // Save a step's worth of responses (with E2E encryption).
   async saveStep(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const intakeId = req.params.intakeId as string;
@@ -99,9 +95,7 @@ export class IntakeController {
     }
   }
 
-  /**
-   * Finalize and submit the intake for clinical review.
-   */
+  // Finalize and submit the intake for clinical review.
   async submit(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const intakeId = req.params.intakeId as string;
@@ -146,10 +140,54 @@ export class IntakeController {
         status: "success",
         data: {
           eligibility,
-          message: eligibility === "ELIGIBLE" 
-            ? "Your intake has been submitted for doctor review." 
+          message: eligibility === "ELIGIBLE"
+            ? "Your intake has been submitted for doctor review."
             : "Based on your responses, you are currently ineligible for this treatment.",
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Unlock a submitted intake for the patient to make corrections.
+  async unlock(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const intakeId = req.params.intakeId as string;
+      const intake = await prisma.intake.findUnique({ where: { id: intakeId } });
+
+      if (!intake) throw new AppError("Intake not found", 404);
+      if (intake.status === "draft") throw new AppError("Intake is already unlocked", 400);
+
+      // Reset to draft
+      await prisma.intake.update({
+        where: { id: intake.id },
+        data: {
+          status: "draft",
+          eligibility: "PENDING",
+        },
+      });
+
+      // Update patient account status back to PENDING_INTAKE
+      await prisma.patient.update({
+        where: { id: intake.patientId },
+        data: { accountStatus: "PENDING_INTAKE" },
+      });
+
+      // Audit Log
+      await prisma.auditLog.create({
+        data: {
+          action: "INTAKE_UNLOCKED",
+          userId: req.user!.id,
+          entityType: "Intake",
+          entityId: intake.id,
+          metadata: JSON.stringify({ reason: "Doctor requested corrections" }),
+        },
+      });
+
+      res.status(200).json({
+        status: "success",
+        message: "Intake has been unlocked. The patient can now make corrections.",
       });
     } catch (error) {
       next(error);

@@ -283,6 +283,7 @@ model Intake {
   clinicalFlags  String?
   eligibility    EligibilityResult @default(PENDING)
   status         String            @default("draft")
+  formVersion    String            @default("1.0.0")
   reviewedById   String?
   submittedAt    DateTime?
   patient        Patient           @relation(fields: [patientId], references: [id])

@@ -139,10 +139,17 @@ export class AuthService {
 
     // Handle MFA if enabled
     if (user.mfaEnabled) {
-      return {
-        mfaRequired: true,
-        userId: user.id,
-      };
+      if (!data.token) {
+        return {
+          mfaRequired: true,
+          userId: user.id,
+        };
+      }
+
+      const isMfaValid = await verify({ token: data.token, secret: user.mfaSecret as string });
+      if (!isMfaValid) {
+        throw new AppError("Invalid MFA token", 401);
+      }
     }
 
     const accessToken = JWT.signAccess({ userId: user.id, role: user.role });

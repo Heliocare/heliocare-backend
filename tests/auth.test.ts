@@ -5,8 +5,9 @@ import app from "../src/app.js";
 import { prisma } from "../src/lib/prisma.js";
 
 describe("Auth Flow Integration", () => {
+  const randomSuffix = Math.floor(Math.random() * 1000000);
   const testUser = {
-    email: `test-${Date.now()}@example.com`,
+    email: `test-${randomSuffix}@example.com`,
     password: "Password123!",
     firstName: "Test",
     lastName: "User",

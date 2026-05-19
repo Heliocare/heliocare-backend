@@ -5,8 +5,9 @@ import app from "../src/app.js";
 import { prisma } from "../src/lib/prisma.js";
 
 describe("Security & Lockout Flow", () => {
+  const randomSuffix = Math.floor(Math.random() * 1000000);
   const testUser = {
-    email: `lockout-${Date.now()}@example.com`,
+    email: `lockout-${randomSuffix}@example.com`,
     password: "CorrectPassword123!",
     firstName: "Lockout",
     lastName: "Test",

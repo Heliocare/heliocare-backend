@@ -5,8 +5,9 @@ import app from "../src/app.js";
 import { prisma } from "../src/lib/prisma.js";
 
 describe("Misc Auth Flows (Refresh, Logout, Reset Password, Resend Verify)", () => {
+  const randomSuffix = Math.floor(Math.random() * 1000000);
   const testUser = {
-    email: `misc-${Date.now()}@example.com`,
+    email: `misc-${randomSuffix}@example.com`,
     password: "InitialPassword123!",
     firstName: "Misc",
     lastName: "Tester",
