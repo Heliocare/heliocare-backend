@@ -60,21 +60,7 @@ enum PrescriptionStatus {
   CANCELLED
 }
 
-enum OrderStatus {
-  PENDING
-  ACKNOWLEDGED
-  PACKED
-  DISPATCHED
-  DELIVERED
-  FAILED
-}
 
-enum LogisticsPartner {
-  GIG
-  KWIK
-  SENDBOX
-  OTHER
-}
 
 enum PlanCode {
   ED_BASIC
@@ -193,7 +179,7 @@ model Patient {
   subscriptions     Subscription[]
   intakes           Intake[]
   prescriptions     Prescription[]
-  orders            Order[]
+
   treatmentPlans    TreatmentPlan[]
   labRequests       LabTestRequest[]
   dietPlans         DietPlan[]
@@ -249,7 +235,7 @@ model Pharmacy {
   canCompound Boolean  @default(false)
   cities      String // JSON
   isActive    Boolean  @default(true)
-  orders      Order[]
+
 }
 
 // --- Care & Treatment ---
@@ -268,7 +254,7 @@ model Subscription {
   patient         Patient        @relation(fields: [patientId], references: [id])
   intakes         Intake[]
   prescriptions   Prescription[]
-  orders          Order[]
+
   paymentEvents   PaymentEvent[]
 
   @@index([patientId, status])
@@ -294,45 +280,31 @@ model Intake {
 }
 
 model Prescription {
-  id             String             @id @default(uuid())
-  patientId      String
-  doctorId       String
-  subscriptionId String
-  drugName       String
-  doseMg         Decimal
-  frequency      String
-  quantity       Int
-  status         PrescriptionStatus @default(ACTIVE)
-  issuedAt       DateTime           @default(now())
-  expiresAt      DateTime
-  digitalSig     String
-  patient        Patient            @relation(fields: [patientId], references: [id])
-  doctor         ProfessionalProfile @relation(fields: [doctorId], references: [id])
-  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
-  orders         Order[]
+  id                 String             @id @default(uuid())
+  patientId          String
+  doctorId           String
+  subscriptionId     String
+  drugName           String
+  doseMg             Decimal
+  frequency          String
+  quantity           Int
+  status             PrescriptionStatus @default(ACTIVE)
+  version            Int                @default(1)
+  parentId           String?
+  pdfS3Key           String?
+  cancellationReason String?
+  issuedAt           DateTime           @default(now())
+  expiresAt          DateTime
+  digitalSig         String
+  patient            Patient            @relation(fields: [patientId], references: [id])
+  doctor             ProfessionalProfile @relation(fields: [doctorId], references: [id])
+  subscription       Subscription       @relation(fields: [subscriptionId], references: [id])
+
 
   @@index([patientId, status])
 }
 
-model Order {
-  id               String            @id @default(uuid())
-  patientId        String
-  prescriptionId   String
-  subscriptionId   String
-  pharmacyId       String
-  status           OrderStatus       @default(PENDING)
-  deliveryAddrEnc  String
-  logisticsPartner LogisticsPartner?
-  trackingNumber   String?
-  createdAt        DateTime          @default(now())
-  deliveredAt      DateTime?
-  patient          Patient           @relation(fields: [patientId], references: [id])
-  prescription     Prescription      @relation(fields: [prescriptionId], references: [id])
-  subscription     Subscription      @relation(fields: [subscriptionId], references: [id])
-  pharmacy         Pharmacy          @relation(fields: [pharmacyId], references: [id])
 
-  @@index([pharmacyId, status])
-}
 
 model TreatmentPlan {
   id             String              @id @default(uuid())

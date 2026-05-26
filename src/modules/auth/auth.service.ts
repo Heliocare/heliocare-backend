@@ -341,7 +341,6 @@ export class AuthService {
           include: {
             intakes: true,
             prescriptions: true,
-            orders: true,
           },
         },
       },
