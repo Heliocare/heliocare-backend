@@ -4,24 +4,12 @@ import { AppError } from "../../utils/AppError.js";
 import { generatePrescriptionPDF } from "../../lib/pdf/prescription.js";
 import { uploadToS3, getSignedUrl } from "../../lib/storage/s3.js";
 import { validatePdfBuffer } from "../../lib/storage/uploadValidation.js";
+import { isGlp1Medication } from "../../lib/clinical/medication.js";
 import { logger } from "../../lib/logger.js";
 
 
 export class PrescriptionService {
-  // Identifies if a drug is a GLP-1 weight loss medication
-  private isGlp1Medication(drugName: string): boolean {
-    const name = drugName.toLowerCase();
-    return (
-      name.includes("semaglutide") ||
-      name.includes("liraglutide") ||
-      name.includes("tirzepatide") ||
-      name.includes("wegovy") ||
-      name.includes("ozempic") ||
-      name.includes("mounjaro")
-    );
-  }
-
-  // Issues a new prescription, generates secure digital signatures & PDFs, uploads to S3, and spawns orders
+  // Issues a new prescription, generates secure digital signatures & PDFs, uploads to S3
   async issuePrescription(
     doctorId: string,
     data: {
@@ -36,7 +24,7 @@ export class PrescriptionService {
     }
   ) {
     // 1. Clinical Gate: Check GLP-1 Lab Requirement
-    if (this.isGlp1Medication(data.drugName)) {
+    if (isGlp1Medication(data.drugName)) {
       const labResultCount = await prisma.labResult.count({
         where: {
           request: {
@@ -183,7 +171,24 @@ export class PrescriptionService {
       return prescription;
     });
 
-
+    // Auto-create PENDING order for the issued prescription
+    try {
+      const { OrderService } = await import("../orders/order.service.js");
+      const orderService = new OrderService();
+      await orderService.createOrder({
+        patientId: data.patientId,
+        prescriptionId,
+        subscriptionId: data.subscriptionId,
+        drugName: data.drugName,
+        patientStateOfResidence: patient.stateOfResidence || "Unknown",
+      });
+      logger.info(`[ORDER_AUTO_CREATED] Order created for prescription ${prescriptionId}`);
+    } catch (orderError: unknown) {
+      logger.error(
+        { err: orderError },
+        `[ORDER_CREATION_FAILED] Failed to auto-create order for prescription ${prescriptionId}`
+      );
+    }
 
     return result;
   }

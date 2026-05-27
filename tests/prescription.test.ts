@@ -280,6 +280,9 @@ describe("Clinical Prescriptions Integration Tests", () => {
       await prisma.labTestRequest.deleteMany({
         where: { patientId },
       });
+      await prisma.order.deleteMany({
+        where: { patientId },
+      });
       await prisma.prescription.deleteMany({
         where: { patientId },
       });
@@ -303,6 +306,9 @@ describe("Clinical Prescriptions Integration Tests", () => {
       where: { id: { in: userIds } },
     });
     if (pharmacyId) {
+      await prisma.order.deleteMany({
+        where: { pharmacyId },
+      });
       await prisma.pharmacy.deleteMany({
         where: { id: pharmacyId },
       });
