@@ -8,6 +8,7 @@ export const WA_TEMPLATES = {
     PAYMENT_FAILED: "payment_failed",
     SUBSCRIPTION_CANCELLED: "subscription_cancelled",
     VIDEO_REMINDER: "video_reminder",
+    PATIENT_REASSIGNED: "patient_reassigned",
 } as const;
 
 export type WaTemplate = typeof WA_TEMPLATES[keyof typeof WA_TEMPLATES];

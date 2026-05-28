@@ -120,6 +120,9 @@ export class AuthService {
     }
 
     if (!user.isActive) {
+      if (user.professionalProfile?.status === "SUSPENDED") {
+        throw new AppError("Your professional account has been suspended. Please contact support.", 403);
+      }
       throw new AppError("Account is inactive", 403);
     }
 

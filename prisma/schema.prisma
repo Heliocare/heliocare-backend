@@ -76,6 +76,14 @@ enum LogisticsPartner {
   OTHER
 }
 
+enum DeactivationReason {
+  VOLUNTARY_RESIGNATION
+  CREDENTIAL_REVOCATION
+  ETHICS_VIOLATION
+  INACTIVITY
+  ADMIN_ACTION
+}
+
 enum PlanCode {
   ED_BASIC
   ED_STANDARD

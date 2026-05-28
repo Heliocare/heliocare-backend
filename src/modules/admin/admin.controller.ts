@@ -14,7 +14,7 @@ const ROLE_TO_REGBODY: Record<string, RegBody> = {
 };
 
 export class AdminController {
-  // Invites a new clinical professional (Doctor, Pharmacist, Lab Scientist, Dietitian)
+  // Invites a new clinical professional.
   async inviteUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, role } = req.body;
