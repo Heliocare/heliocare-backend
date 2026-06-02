@@ -46,6 +46,8 @@ enum AccountStatus {
   SUSPENDED
   CANCELLED
   INELIGIBLE
+  DELETION_REQUESTED
+  DELETION_SCHEDULED
 }
 
 enum EligibilityResult {
@@ -186,17 +188,24 @@ model RefreshToken {
 // --- Clinical Entities ---
 
 model Patient {
-  id                String               @id @default(uuid())
-  userId            String               @unique
-  firstName         String
-  lastName          String
-  gender            String
-  dob               DateTime
-  address           String
-  stateOfResidence  String
-  ndprConsentAt     DateTime?
-  marketingOptIn    Boolean              @default(false)
-  accountStatus     AccountStatus        @default(PENDING_INTAKE)
+  id                     String               @id @default(uuid())
+  userId                 String               @unique
+  firstName              String
+  lastName               String
+  gender                 String
+  dob                    DateTime
+  address                String
+  stateOfResidence       String
+  firstNameEnc           String?
+  lastNameEnc            String?
+  genderEnc              String?
+  dobEnc                 String?
+  addressEnc             String?
+  stateOfResidenceEnc    String?
+  ndprConsentAt          DateTime?
+  marketingOptIn         Boolean              @default(false)
+  accountStatus          AccountStatus        @default(PENDING_INTAKE)
+  scheduledForDeletionAt DateTime?
   user              User                 @relation(fields: [userId], references: [id])
   subscriptions     Subscription[]
   intakes           Intake[]

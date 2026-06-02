@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
+import { Crypto } from "../../utils/crypto.js";
 
 export class OnboardingController {
   // Creates a patient profile linked to the authenticated user.
@@ -16,7 +17,7 @@ export class OnboardingController {
 
       const { firstName, lastName, gender, dob, address, stateOfResidence, marketingOptIn } = req.body;
 
-      // 2. Update the patient record with onboarding details
+      // 2. Update the patient record with onboarding details (plaintext + encrypted)
       const patient = await prisma.patient.update({
         where: { userId },
         data: {
@@ -28,6 +29,13 @@ export class OnboardingController {
           stateOfResidence,
           marketingOptIn,
           accountStatus: "PENDING_INTAKE",
+          // Dual-write encrypted PII fields
+          firstNameEnc: Crypto.encrypt(firstName),
+          lastNameEnc: Crypto.encrypt(lastName),
+          genderEnc: Crypto.encrypt(gender),
+          dobEnc: Crypto.encrypt(dob),
+          addressEnc: Crypto.encrypt(address),
+          stateOfResidenceEnc: Crypto.encrypt(stateOfResidence),
         },
       });
 

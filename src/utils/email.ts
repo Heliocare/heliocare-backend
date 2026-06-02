@@ -76,6 +76,28 @@ export class Email {
   }
 
   /**
+   * Sends an NDPR data deletion confirmation email
+   */
+  static async sendDeletionConfirmation(to: string, scheduledDate: Date): Promise<void> {
+    const dateStr = scheduledDate.toISOString().split("T")[0];
+    const subject = "Your Heliocare account deletion request";
+    const text =
+      `We have received your request to delete your Heliocare account and all associated data.\n\n` +
+      `Your data will be permanently erased on ${dateStr}, after a 30-day grace period. ` +
+      `If you did not make this request, please contact our support team immediately to restore your account.\n\n` +
+      `- The Heliocare Team`;
+    const html = `
+      <h1>Account Deletion Scheduled</h1>
+      <p>We have received your request to delete your Heliocare account and all associated data.</p>
+      <p><strong>Your data will be permanently erased on ${dateStr}</strong>, after a 30-day grace period.</p>
+      <p>If you did not make this request, please contact our support team immediately to restore your account.</p>
+      <p style="color: #666;">- The Heliocare Team</p>
+    `;
+
+    await this.send(to, subject, text, html);
+  }
+
+  /**
    * Internal method to handle the actual sending logic
    */
   private static async send(to: string, subject: string, text: string, html: string): Promise<void> {
