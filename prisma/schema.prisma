@@ -188,8 +188,8 @@ model RefreshToken {
 // --- Clinical Entities ---
 
 model Patient {
-  id                     String               @id @default(uuid())
-  userId                 String               @unique
+  id                     String         @id @default(uuid())
+  userId                 String         @unique
   firstName              String
   lastName               String
   gender                 String
@@ -203,14 +203,14 @@ model Patient {
   addressEnc             String?
   stateOfResidenceEnc    String?
   ndprConsentAt          DateTime?
-  marketingOptIn         Boolean              @default(false)
-  accountStatus          AccountStatus        @default(PENDING_INTAKE)
+  marketingOptIn         Boolean        @default(false)
+  accountStatus          AccountStatus  @default(PENDING_INTAKE)
   scheduledForDeletionAt DateTime?
-  user              User                 @relation(fields: [userId], references: [id])
-  subscriptions     Subscription[]
-  intakes           Intake[]
-  prescriptions     Prescription[]
-  orders            Order[]
+  user                   User           @relation(fields: [userId], references: [id])
+  subscriptions          Subscription[]
+  intakes                Intake[]
+  prescriptions          Prescription[]
+  orders                 Order[]
 
   treatmentPlans    TreatmentPlan[]
   labRequests       LabTestRequest[]
@@ -224,26 +224,27 @@ model Patient {
 }
 
 model ProfessionalProfile {
-  id               String             @id @default(uuid())
-  userId           String             @unique
-  fullName         String
-  registrationNum  String             @unique // MDCN/PCN/MLSCN number
-  regBody          RegBody
-  specialisation   String?
-  status           ProfessionalStatus @default(PENDING)
-  isAvailable      Boolean            @default(true)
-  availability     String? // JSON
-  maxOpenConsults  Int                @default(25)
-  user             User               @relation(fields: [userId], references: [id])
-  patients         PatientProfessional[]
-  prescriptions    Prescription[]
-  intakeReviews    Intake[]
-  treatmentPlans   TreatmentPlan[]
-  labRequests      LabTestRequest[]
-  dietPlans        DietPlan[]
-  consultationNotes ConsultationNote[]
-  videoSlots       VideoSlot[]
-  progressAnnotated ProgressEntry[]
+  id                   String                @id @default(uuid())
+  userId               String                @unique
+  fullName             String
+  registrationNum      String                @unique // MDCN/PCN/MLSCN number
+  regBody              RegBody
+  specialisation       String?
+  status               ProfessionalStatus    @default(PENDING)
+  isAvailable          Boolean               @default(true)
+  availability         String? // JSON
+  maxOpenConsults      Int                   @default(25)
+  user                 User                  @relation(fields: [userId], references: [id])
+  patients             PatientProfessional[]
+  prescriptions        Prescription[]
+  intakeReviews        Intake[]
+  treatmentPlans       TreatmentPlan[]
+  labRequests          LabTestRequest[]
+  labResultAnnotations LabResult[]           @relation("LabResultAnnotations")
+  dietPlans            DietPlan[]
+  consultationNotes    ConsultationNote[]
+  videoSlots           VideoSlot[]
+  progressAnnotated    ProgressEntry[]
 
   @@index([status])
   @@index([regBody])
@@ -260,15 +261,14 @@ model PatientProfessional {
 }
 
 model Pharmacy {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
-  pcnLicence  String   @unique
+  pcnLicence  String  @unique
   address     String?
-  canCompound Boolean  @default(false)
+  canCompound Boolean @default(false)
   cities      String // JSON
-  isActive    Boolean  @default(true)
+  isActive    Boolean @default(true)
   orders      Order[]
-
 }
 
 model Order {
@@ -318,32 +318,32 @@ model Subscription {
   prescriptions   Prescription[]
   orders          Order[]
 
-  paymentEvents   PaymentEvent[]
+  paymentEvents PaymentEvent[]
 
   @@index([patientId, status])
 }
 
 model Intake {
-  id             String            @id @default(uuid())
+  id             String               @id @default(uuid())
   patientId      String
   subscriptionId String?
   vertical       Vertical
   responsesEnc   String
   clinicalFlags  String?
-  eligibility    EligibilityResult @default(PENDING)
-  status         String            @default("draft")
-  formVersion    String            @default("1.0.0")
+  eligibility    EligibilityResult    @default(PENDING)
+  status         String               @default("draft")
+  formVersion    String               @default("1.0.0")
   reviewedById   String?
   submittedAt    DateTime?
-  patient        Patient           @relation(fields: [patientId], references: [id])
-  subscription   Subscription?     @relation(fields: [subscriptionId], references: [id])
+  patient        Patient              @relation(fields: [patientId], references: [id])
+  subscription   Subscription?        @relation(fields: [subscriptionId], references: [id])
   reviewedBy     ProfessionalProfile? @relation(fields: [reviewedById], references: [id])
 
   @@index([patientId, vertical])
 }
 
 model Prescription {
-  id                 String             @id @default(uuid())
+  id                 String              @id @default(uuid())
   patientId          String
   doctorId           String
   subscriptionId     String
@@ -351,51 +351,55 @@ model Prescription {
   doseMg             Decimal
   frequency          String
   quantity           Int
-  status             PrescriptionStatus @default(ACTIVE)
-  version            Int                @default(1)
+  status             PrescriptionStatus  @default(ACTIVE)
+  version            Int                 @default(1)
   parentId           String?
   pdfS3Key           String?
   cancellationReason String?
-  issuedAt           DateTime           @default(now())
+  issuedAt           DateTime            @default(now())
   expiresAt          DateTime
   digitalSig         String
-  patient            Patient            @relation(fields: [patientId], references: [id])
+  patient            Patient             @relation(fields: [patientId], references: [id])
   doctor             ProfessionalProfile @relation(fields: [doctorId], references: [id])
-  subscription       Subscription       @relation(fields: [subscriptionId], references: [id])
+  subscription       Subscription        @relation(fields: [subscriptionId], references: [id])
   orders             Order[]
-
 
   @@index([patientId, status])
 }
 
-
-
 model TreatmentPlan {
-  id             String              @id @default(uuid())
-  patientId      String
-  professionalId String
-  title          String
-  description    String?
-  status         TreatmentPlanStatus @default(ACTIVE)
-  startDate      DateTime            @default(now())
-  endDate        DateTime?
-  patient        Patient             @relation(fields: [patientId], references: [id])
-  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  id                      String              @id @default(uuid())
+  patientId               String
+  professionalId          String
+  title                   String
+  description             String?
+  status                  TreatmentPlanStatus @default(ACTIVE)
+  startDate               DateTime            @default(now())
+  endDate                 DateTime?
+  version                 Int                 @default(1)
+  parentId                String?
+  dietitianReferralStatus String?
+  dietitianReferralNote   String?
+  patient                 Patient             @relation(fields: [patientId], references: [id])
+  professional            ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  parent                  TreatmentPlan?      @relation("PlanVersions", fields: [parentId], references: [id])
+  childVersions           TreatmentPlan[]     @relation("PlanVersions")
 
   @@index([patientId])
+  @@index([parentId])
 }
 
 // --- Lab Diagnostics ---
 
 model LabTestRequest {
-  id             String           @id @default(uuid())
+  id             String              @id @default(uuid())
   patientId      String
   professionalId String
   testCodes      String // JSON array of codes
-  status         LabRequestStatus @default(PENDING)
-  sampleMethod   SampleMethod     @default(WALK_IN)
-  requestedAt    DateTime         @default(now())
-  patient        Patient          @relation(fields: [patientId], references: [id])
+  status         LabRequestStatus    @default(PENDING)
+  sampleMethod   SampleMethod        @default(WALK_IN)
+  requestedAt    DateTime            @default(now())
+  patient        Patient             @relation(fields: [patientId], references: [id])
   professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
   results        LabResult[]
 
@@ -403,16 +407,20 @@ model LabTestRequest {
 }
 
 model LabResult {
-  id             String         @id @default(uuid())
-  requestId      String
-  testName       String
-  value          String
-  unit           String?
-  referenceRange String?
-  flag           ResultFlag     @default(NORMAL)
-  labNotes       String?
-  recordedAt     DateTime       @default(now())
-  request        LabTestRequest @relation(fields: [requestId], references: [id])
+  id               String               @id @default(uuid())
+  requestId        String
+  testName         String
+  value            String
+  unit             String?
+  referenceRange   String?
+  flag             ResultFlag           @default(NORMAL)
+  labNotes         String?
+  doctorAnnotation String?
+  annotatedById    String?
+  annotatedAt      DateTime?
+  recordedAt       DateTime             @default(now())
+  request          LabTestRequest       @relation(fields: [requestId], references: [id])
+  annotatedBy      ProfessionalProfile? @relation("LabResultAnnotations", fields: [annotatedById], references: [id])
 
   @@index([requestId])
 }
@@ -420,16 +428,16 @@ model LabResult {
 // --- Nutrition ---
 
 model DietPlan {
-  id             String         @id @default(uuid())
+  id             String              @id @default(uuid())
   patientId      String
   professionalId String
-  status         DietPlanStatus @default(ACTIVE)
+  status         DietPlanStatus      @default(ACTIVE)
   caloriesPerDay Int?
   macroSplit     String? // JSON: {p:30, c:40, f:30}
   instructions   String?
-  startDate      DateTime       @default(now())
+  startDate      DateTime            @default(now())
   endDate        DateTime?
-  patient        Patient        @relation(fields: [patientId], references: [id])
+  patient        Patient             @relation(fields: [patientId], references: [id])
   professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
   adherenceLogs  DietAdherenceLog[]
 
@@ -437,12 +445,12 @@ model DietPlan {
 }
 
 model DietAdherenceLog {
-  id         String   @id @default(uuid())
-  planId     String
-  date       DateTime @db.Date
-  adhered    Boolean
-  userNotes  String?
-  plan       DietPlan @relation(fields: [planId], references: [id])
+  id        String   @id @default(uuid())
+  planId    String
+  date      DateTime @db.Date
+  adhered   Boolean
+  userNotes String?
+  plan      DietPlan @relation(fields: [planId], references: [id])
 
   @@index([planId, date])
 }
@@ -463,13 +471,13 @@ model Message {
 }
 
 model ConsultationNote {
-  id             String          @id @default(uuid())
+  id             String              @id @default(uuid())
   patientId      String
   professionalId String
-  type           ConsultNoteType @default(SOAP)
+  type           ConsultNoteType     @default(SOAP)
   contentEnc     String // Encrypted SOAP or follow-up notes
-  createdAt      DateTime        @default(now())
-  patient        Patient         @relation(fields: [patientId], references: [id])
+  createdAt      DateTime            @default(now())
+  patient        Patient             @relation(fields: [patientId], references: [id])
   professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
   videoSlot      VideoSlot?
 
@@ -477,15 +485,15 @@ model ConsultationNote {
 }
 
 model VideoSlot {
-  id             String            @id @default(uuid())
-  professionalId String
-  patientId      String?
-  startTime      DateTime
-  endTime        DateTime
-  isBooked       Boolean           @default(false)
-  consultationNoteId String?       @unique
-  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
-  consultationNote   ConsultationNote? @relation(fields: [consultationNoteId], references: [id])
+  id                 String              @id @default(uuid())
+  professionalId     String
+  patientId          String?
+  startTime          DateTime
+  endTime            DateTime
+  isBooked           Boolean             @default(false)
+  consultationNoteId String?             @unique
+  professional       ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  consultationNote   ConsultationNote?   @relation(fields: [consultationNoteId], references: [id])
 
   @@index([professionalId, startTime])
 }
@@ -493,14 +501,14 @@ model VideoSlot {
 // --- Monitoring & Audit ---
 
 model ProgressEntry {
-  id                  String   @id @default(uuid())
+  id                  String              @id @default(uuid())
   patientId           String
   weightKg            Decimal
   notes               String?
   dietitianAnnotation String?
   enteredById         String // User ID of person who entered it
-  recordedAt          DateTime @default(now())
-  patient             Patient  @relation(fields: [patientId], references: [id])
+  recordedAt          DateTime            @default(now())
+  patient             Patient             @relation(fields: [patientId], references: [id])
   enteredBy           ProfessionalProfile @relation(fields: [enteredById], references: [id])
 
   @@index([patientId, recordedAt])
