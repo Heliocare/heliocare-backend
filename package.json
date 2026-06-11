@@ -5,6 +5,8 @@
   "description": "",
   "main": "src/server.ts",
   "scripts": {
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run"

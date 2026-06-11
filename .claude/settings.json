@@ -1,8 +1,3 @@
 {
-  "theme": "dark",
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "sk-e43186fada654d0cadfc3e14d6a8e2cb",
-    "ANTHROPIC_MODEL": "deepseek-v4-pro"
-  }
+  "theme": "dark"
 }
