@@ -3,7 +3,6 @@ import http from "node:http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { Database } from "./lib/prisma.js";
-import { SocketServer } from "./lib/socket.js";
 
 // Application server manager
 class Server {
@@ -18,11 +17,8 @@ class Server {
   start(): void {
     const httpServer = http.createServer(app);
 
-    // Initialize Sockets
-    SocketServer.init(httpServer);
-
     this.server = httpServer.listen(this.port, () => {
-      logger.info(`Server is running on port ${this.port} (HTTP & WebSockets)`);
+      logger.info(`Server is running on port ${this.port}`);
     });
 
     this.registerShutdownHandlers();

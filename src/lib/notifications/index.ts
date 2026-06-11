@@ -41,6 +41,12 @@ export const notifyVideoReminder = async (phone: string, _slotTime: string) => {
     return sendWhatsAppTemplate(phone, WA_TEMPLATES.VIDEO_REMINDER);
 };
 
+export const notifyPatientReassigned = async (phone: string, professionalName: string) => {
+    return sendWhatsAppTemplate(phone, WA_TEMPLATES.PATIENT_REASSIGNED, "en", [
+        { type: "body", parameters: [{ type: "text", text: professionalName }] },
+    ]);
+};
+
 // === Email Notifications ===
 
 export const sendVerifyEmail = async (email: string, verificationUrl: string) => {

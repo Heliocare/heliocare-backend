@@ -4,17 +4,43 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 
 // Route imports
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
-import messageRoutes from "./modules/messages/message.routes.js";
 import onboardingRoutes from "./modules/onboarding/onboarding.routes.js";
 import intakeRoutes from "./modules/intake/intake.routes.js";
+import prescriptionRoutes from "./modules/prescriptions/prescription.routes.js";
+import orderRoutes from "./modules/orders/order.routes.js";
+import professionalRoutes from "./modules/professionals/professional.routes.js";
+import patientRoutes from "./modules/patients/patient.routes.js";
+import treatmentRoutes from "./modules/treatment/treatment.routes.js";
 
 import { ErrorMiddleware } from "./middleware/errorHandler.js";
 
 const app: Application = express();
+
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Heliocare API",
+      version: "1.0.0",
+      description: "API Documentation for Heliocare Backend",
+    },
+    servers: [
+      {
+        url: `http://localhost:${process.env.PORT}`,
+        description: "Development server",
+      },
+    ],
+  },
+  apis: ["./src/modules/**/*.ts"],
+};
+
+const swaggerSpecs = swaggerJsdoc(swaggerOptions);
 
 // Security Middleware
 app.use(helmet());
@@ -22,7 +48,7 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:5173"],
+    origin: ["http://localhost:3000", "http://localhost:5173", "*"],
     credentials: true,
   })
 );
@@ -50,12 +76,19 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("Heliocare Backend API is running.");
 });
 
+// Swagger Documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/messages", messageRoutes);
 app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/intake", intakeRoutes);
+app.use("/api/prescriptions", prescriptionRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/professionals", professionalRoutes);
+app.use("/api/patients", patientRoutes);
+app.use("/api/treatment", treatmentRoutes);
 
 // Global Error Handler
 app.use(ErrorMiddleware.handle);

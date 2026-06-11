@@ -27,4 +27,11 @@ router.post(
   intakeController.submit
 );
 
+router.post(
+  "/:intakeId/unlock",
+  AuthMiddleware.restrictTo("DOCTOR", "ADMIN", "SUPER_ADMIN"),
+  AuthMiddleware.requireMfa,
+  intakeController.unlock
+);
+
 export default router;

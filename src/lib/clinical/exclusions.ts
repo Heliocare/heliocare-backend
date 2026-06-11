@@ -10,7 +10,10 @@ export function evaluateExclusions(vertical: Vertical, responses: any): Exclusio
     const soft: string[] = [];
 
     // Provide default empty objects natively if parts are missing during early steps
-    const { personalDetails = {}, medicalHistory = {}, currentMedications = {}, biometrics = {} } = responses || {};
+    const { personalDetails = {},
+        medicalHistory = {},
+        currentMedications = {},
+        biometrics = {} } = responses || {};
 
     if (vertical === "ED") {
         if (currentMedications.includesNitrates === true) hard.push("ED_NITRATES");

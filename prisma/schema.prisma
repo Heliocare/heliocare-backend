@@ -7,13 +7,30 @@ datasource db {
   provider = "postgresql"
 }
 
-// Enums
+// --- Enums ---
+
 enum UserRole {
   PATIENT
   DOCTOR
   PHARMACY
+  PHARMACIST
+  LAB_SCIENTIST
+  DIETITIAN
   ADMIN
   SUPER_ADMIN
+}
+
+enum ProfessionalStatus {
+  VERIFIED
+  PENDING
+  SUSPENDED
+}
+
+enum RegBody {
+  MDCN
+  PCN
+  MLSCN
+  ODBN
 }
 
 enum Vertical {
@@ -29,6 +46,8 @@ enum AccountStatus {
   SUSPENDED
   CANCELLED
   INELIGIBLE
+  DELETION_REQUESTED
+  DELETION_SCHEDULED
 }
 
 enum EligibilityResult {
@@ -59,6 +78,14 @@ enum LogisticsPartner {
   OTHER
 }
 
+enum DeactivationReason {
+  VOLUNTARY_RESIGNATION
+  CREDENTIAL_REVOCATION
+  ETHICS_VIOLATION
+  INACTIVITY
+  ADMIN_ACTION
+}
+
 enum PlanCode {
   ED_BASIC
   ED_STANDARD
@@ -73,46 +100,82 @@ enum ConsultMode {
   VIDEO
 }
 
-enum MessageSender {
-  PATIENT
-  DOCTOR
-  SYSTEM
+enum LabRequestStatus {
+  PENDING
+  SAMPLE_COLLECTED
+  PROCESSING
+  COMPLETED
+  CANCELLED
 }
 
-// Users (single auth table for all roles)
+enum ResultFlag {
+  NORMAL
+  ABNORMAL
+  CRITICAL
+}
+
+enum DietPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TreatmentPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ConsultNoteType {
+  SOAP
+  FOLLOW_UP
+  INITIAL
+}
+
+enum MessageThread {
+  PATIENT_DOCTOR
+  PATIENT_DIETITIAN
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum SampleMethod {
+  HOME_COLLECTION
+  WALK_IN
+}
+
+// --- Auth & Users ---
+
 model User {
-  id                       String         @id @default(uuid())
-  email                    String         @unique
+  id                       String               @id @default(uuid())
+  email                    String               @unique
   phone                    String?
   password                 String
-  role                     UserRole       @default(PATIENT)
-  isActive                 Boolean        @default(true)
-  isEmailVerified          Boolean        @default(false)
-  emailVerificationToken   String?        @unique
+  role                     UserRole             @default(PATIENT)
+  isActive                 Boolean              @default(true)
+  isEmailVerified          Boolean              @default(false)
+  emailVerificationToken   String?              @unique
   emailVerificationExpires DateTime?
-  passwordResetToken       String?        @unique
+  passwordResetToken       String?              @unique
   passwordResetExpires     DateTime?
-  failedLoginAttempts      Int            @default(0)
+  failedLoginAttempts      Int                  @default(0)
   lockUntil                DateTime?
-  mfaSecret                String? // TOTP for doctor/admin roles
-  mfaEnabled               Boolean        @default(false)
-  createdAt                DateTime       @default(now())
+  mfaSecret                String?
+  mfaEnabled               Boolean              @default(false)
+  createdAt                DateTime             @default(now())
   lastLoginAt              DateTime?
   refreshTokens            RefreshToken[]
   patient                  Patient?
-  doctor                   Doctor?
-  pharmacist               Pharmacist?
+  professionalProfile      ProfessionalProfile?
   auditLogs                AuditLog[]
 
   @@index([email])
-  @@index([emailVerificationToken])
-  @@index([passwordResetToken])
+  @@index([role])
 }
 
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String
-  token     String    @unique // SHA-256 hash of the raw token
+  token     String    @unique
   expiresAt DateTime
   revokedAt DateTime?
   userAgent String?
@@ -122,242 +185,359 @@ model RefreshToken {
   @@index([userId])
 }
 
-// Patient
+// --- Clinical Entities ---
+
 model Patient {
-  id               String          @id @default(uuid())
-  userId           String          @unique
-  // Encrypted PII (AES-256-GCM, stored as base64 ciphertext:iv:tag)
-  firstName        String
-  lastName         String
-  gender           String
-  dob              DateTime
-  address          String
-  stateOfResidence String // NOT encrypted - used for routing/filtering
-  ndprConsentAt    DateTime?
-  marketingOptIn   Boolean         @default(false)
-  accountStatus    AccountStatus   @default(PENDING_INTAKE)
-  subscriptions    Subscription[]
-  intakes          Intake[]
-  messages         Message[]
-  progressEntries  ProgressEntry[]
-  user             User            @relation(fields: [userId], references: [id])
-  prescriptions    Prescription[]
+  id                     String         @id @default(uuid())
+  userId                 String         @unique
+  firstName              String
+  lastName               String
+  gender                 String
+  dob                    DateTime
+  address                String
+  stateOfResidence       String
+  firstNameEnc           String?
+  lastNameEnc            String?
+  genderEnc              String?
+  dobEnc                 String?
+  addressEnc             String?
+  stateOfResidenceEnc    String?
+  ndprConsentAt          DateTime?
+  marketingOptIn         Boolean        @default(false)
+  accountStatus          AccountStatus  @default(PENDING_INTAKE)
+  scheduledForDeletionAt DateTime?
+  user                   User           @relation(fields: [userId], references: [id])
+  subscriptions          Subscription[]
+  intakes                Intake[]
+  prescriptions          Prescription[]
+  orders                 Order[]
+
+  treatmentPlans    TreatmentPlan[]
+  labRequests       LabTestRequest[]
+  dietPlans         DietPlan[]
+  progressEntries   ProgressEntry[]
+  professionals     PatientProfessional[]
+  messages          Message[]
+  consultationNotes ConsultationNote[]
 
   @@index([accountStatus])
 }
 
-// Doctor
-model Doctor {
-  id               String         @id @default(uuid())
-  userId           String         @unique
-  fullName         String
-  mdcnRegistration String         @unique
-  specialisation   String?
-  isAvailable      Boolean        @default(true)
-  maxOpenConsults  Int            @default(25)
-  availability     String // JSON: { mon:[{start:'09:00',end:'17:00'}], ... }
-  user             User           @relation(fields: [userId], references: [id])
-  prescriptions    Prescription[]
-  messages         Message[]
-  intakeReviews    Intake[]       @relation("ReviewedBy")
-  videoSlots       VideoSlot[]
+model ProfessionalProfile {
+  id                   String                @id @default(uuid())
+  userId               String                @unique
+  fullName             String
+  registrationNum      String                @unique // MDCN/PCN/MLSCN number
+  regBody              RegBody
+  specialisation       String?
+  status               ProfessionalStatus    @default(PENDING)
+  isAvailable          Boolean               @default(true)
+  availability         String? // JSON
+  maxOpenConsults      Int                   @default(25)
+  user                 User                  @relation(fields: [userId], references: [id])
+  patients             PatientProfessional[]
+  prescriptions        Prescription[]
+  intakeReviews        Intake[]
+  treatmentPlans       TreatmentPlan[]
+  labRequests          LabTestRequest[]
+  labResultAnnotations LabResult[]           @relation("LabResultAnnotations")
+  dietPlans            DietPlan[]
+  consultationNotes    ConsultationNote[]
+  videoSlots           VideoSlot[]
+  progressAnnotated    ProgressEntry[]
+
+  @@index([status])
+  @@index([regBody])
 }
 
-// Pharmacist
-model Pharmacist {
-  id         String   @id @default(uuid())
-  userId     String   @unique
-  pharmacyId String
-  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id])
-  user       User     @relation(fields: [userId], references: [id])
+model PatientProfessional {
+  patientId      String
+  professionalId String
+  assignedAt     DateTime            @default(now())
+  patient        Patient             @relation(fields: [patientId], references: [id])
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
+
+  @@id([patientId, professionalId])
 }
 
 model Pharmacy {
-  id          String       @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
-  pcnLicence  String       @unique
-  canCompound Boolean      @default(false)
-  cities      String // JSON array of service cities
-  isActive    Boolean      @default(true)
-  pharmacists Pharmacist[]
+  pcnLicence  String  @unique
+  address     String?
+  canCompound Boolean @default(false)
+  cities      String // JSON
+  isActive    Boolean @default(true)
   orders      Order[]
 }
 
-// Subscription
-model Subscription {
-  id                       String         @id @default(uuid())
-  patientId                String
-  vertical                 Vertical
-  planCode                 PlanCode
-  status                   AccountStatus
-  paystackSubscriptionCode String?        @unique
-  paystackCustomerCode     String?
-  amount                   Int // Store in kobo, display as Naira
-  billingDay               Int // 1-28
-  nextBillingDate          DateTime?
-  nextRefillDate           DateTime?
-  pausedUntil              DateTime?
-  createdAt                DateTime       @default(now())
-  cancelledAt              DateTime?
-  patient                  Patient        @relation(fields: [patientId], references: [id])
-  intakes                  Intake[]
-  prescriptions            Prescription[]
-  orders                   Order[]
-  paymentEvents            PaymentEvent[]
-
-  @@index([patientId, status])
-}
-
-// Intake
-model Intake {
-  id             String            @id @default(uuid())
-  patientId      String
-  subscriptionId String?
-  vertical       Vertical
-  formVersion    String // e.g. '1.0.0' - bump on exclusion rule changes
-  responsesEnc   String // JSON stringified then AES-256-GCM encrypted
-  clinicalFlags  String? // JSON array of triggered exclusion codes
-  eligibility    EligibilityResult @default(PENDING)
-  status         String            @default("draft") // draft|submitted|reviewed
-  submittedAt    DateTime?
-  reviewedAt     DateTime?
-  reviewedById   String?
-  patient        Patient           @relation(fields: [patientId], references: [id])
-  subscription   Subscription?     @relation(fields: [subscriptionId], references: [id])
-  reviewedBy     Doctor?           @relation("ReviewedBy", fields: [reviewedById], references: [id])
-
-  @@index([patientId, vertical, status])
-}
-
-// Prescription
-model Prescription {
-  id             String             @id @default(uuid())
-  patientId      String
-  doctorId       String
-  subscriptionId String
-  drugName       String
-  doseMg         Decimal
-  frequency      String
-  quantity       Int
-  refillsAuth    Int
-  refillsUsed    Int                @default(0)
-  status         PrescriptionStatus @default(ACTIVE)
-  issuedAt       DateTime           @default(now())
-  expiresAt      DateTime
-  pdfUrl         String?
-  pdfHash        String? // SHA-256 of PDF content for integrity
-  digitalSig     String // SHA-256(patientId+doctorId+drugName+dose+issuedAt)
-  patient        Patient            @relation(fields: [patientId], references: [id])
-  doctor         Doctor             @relation(fields: [doctorId], references: [id])
-  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
-  orders         Order[]
-
-  @@index([patientId, status])
-  @@index([subscriptionId])
-}
-
-// Order
 model Order {
-  id               String            @id @default(uuid())
-  patientId        String
-  prescriptionId   String
-  subscriptionId   String
-  pharmacyId       String
-  status           OrderStatus       @default(PENDING)
-  deliveryAddrEnc  String // Snapshot of address at order time, encrypted
-  logisticsPartner LogisticsPartner?
-  trackingNumber   String?
-  coldChain        Boolean           @default(false)
-  isDiscreet       Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  acknowledgedAt   DateTime?
-  packedAt         DateTime?
-  dispatchedAt     DateTime?
-  estDeliveryDate  DateTime?
-  deliveredAt      DateTime?
-  pharmacyNotes    String?
-  prescription     Prescription      @relation(fields: [prescriptionId], references: [id])
-  subscription     Subscription      @relation(fields: [subscriptionId], references: [id])
-  pharmacy         Pharmacy          @relation(fields: [pharmacyId], references: [id])
+  id                String            @id @default(uuid())
+  patientId         String
+  prescriptionId    String
+  subscriptionId    String
+  pharmacyId        String?
+  status            OrderStatus       @default(PENDING)
+  deliveryAddrEnc   String?
+  logisticsPartner  LogisticsPartner?
+  trackingNumber    String?
+  coldChain         Boolean           @default(false)
+  discreetPackaging Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  acknowledgedAt    DateTime?
+  packedAt          DateTime?
+  dispatchedAt      DateTime?
+  estDeliveryDate   DateTime?
+  deliveredAt       DateTime?
+  pharmacyNotes     String?
+  patient           Patient           @relation(fields: [patientId], references: [id])
+  prescription      Prescription      @relation(fields: [prescriptionId], references: [id])
+  subscription      Subscription      @relation(fields: [subscriptionId], references: [id])
+  pharmacy          Pharmacy?         @relation(fields: [pharmacyId], references: [id])
 
   @@index([pharmacyId, status])
   @@index([patientId, status])
+  @@index([prescriptionId])
 }
 
-// Messaging
+// --- Care & Treatment ---
+
+model Subscription {
+  id              String         @id @default(uuid())
+  patientId       String
+  vertical        Vertical
+  planCode        PlanCode
+  status          AccountStatus
+  paystackCode    String?        @unique
+  amount          Int
+  billingDay      Int
+  nextBillingDate DateTime?
+  createdAt       DateTime       @default(now())
+  patient         Patient        @relation(fields: [patientId], references: [id])
+  intakes         Intake[]
+  prescriptions   Prescription[]
+  orders          Order[]
+
+  paymentEvents PaymentEvent[]
+
+  @@index([patientId, status])
+}
+
+model Intake {
+  id             String               @id @default(uuid())
+  patientId      String
+  subscriptionId String?
+  vertical       Vertical
+  responsesEnc   String
+  clinicalFlags  String?
+  eligibility    EligibilityResult    @default(PENDING)
+  status         String               @default("draft")
+  formVersion    String               @default("1.0.0")
+  reviewedById   String?
+  submittedAt    DateTime?
+  patient        Patient              @relation(fields: [patientId], references: [id])
+  subscription   Subscription?        @relation(fields: [subscriptionId], references: [id])
+  reviewedBy     ProfessionalProfile? @relation(fields: [reviewedById], references: [id])
+
+  @@index([patientId, vertical])
+}
+
+model Prescription {
+  id                 String              @id @default(uuid())
+  patientId          String
+  doctorId           String
+  subscriptionId     String
+  drugName           String
+  doseMg             Decimal
+  frequency          String
+  quantity           Int
+  status             PrescriptionStatus  @default(ACTIVE)
+  version            Int                 @default(1)
+  parentId           String?
+  pdfS3Key           String?
+  cancellationReason String?
+  issuedAt           DateTime            @default(now())
+  expiresAt          DateTime
+  digitalSig         String
+  patient            Patient             @relation(fields: [patientId], references: [id])
+  doctor             ProfessionalProfile @relation(fields: [doctorId], references: [id])
+  subscription       Subscription        @relation(fields: [subscriptionId], references: [id])
+  orders             Order[]
+
+  @@index([patientId, status])
+}
+
+model TreatmentPlan {
+  id                      String              @id @default(uuid())
+  patientId               String
+  professionalId          String
+  title                   String
+  description             String?
+  status                  TreatmentPlanStatus @default(ACTIVE)
+  startDate               DateTime            @default(now())
+  endDate                 DateTime?
+  version                 Int                 @default(1)
+  parentId                String?
+  dietitianReferralStatus String?
+  dietitianReferralNote   String?
+  patient                 Patient             @relation(fields: [patientId], references: [id])
+  professional            ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  parent                  TreatmentPlan?      @relation("PlanVersions", fields: [parentId], references: [id])
+  childVersions           TreatmentPlan[]     @relation("PlanVersions")
+
+  @@index([patientId])
+  @@index([parentId])
+}
+
+// --- Lab Diagnostics ---
+
+model LabTestRequest {
+  id             String              @id @default(uuid())
+  patientId      String
+  professionalId String
+  testCodes      String // JSON array of codes
+  status         LabRequestStatus    @default(PENDING)
+  sampleMethod   SampleMethod        @default(WALK_IN)
+  requestedAt    DateTime            @default(now())
+  patient        Patient             @relation(fields: [patientId], references: [id])
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  results        LabResult[]
+
+  @@index([patientId, status])
+}
+
+model LabResult {
+  id               String               @id @default(uuid())
+  requestId        String
+  testName         String
+  value            String
+  unit             String?
+  referenceRange   String?
+  flag             ResultFlag           @default(NORMAL)
+  labNotes         String?
+  doctorAnnotation String?
+  annotatedById    String?
+  annotatedAt      DateTime?
+  recordedAt       DateTime             @default(now())
+  request          LabTestRequest       @relation(fields: [requestId], references: [id])
+  annotatedBy      ProfessionalProfile? @relation("LabResultAnnotations", fields: [annotatedById], references: [id])
+
+  @@index([requestId])
+}
+
+// --- Nutrition ---
+
+model DietPlan {
+  id             String              @id @default(uuid())
+  patientId      String
+  professionalId String
+  status         DietPlanStatus      @default(ACTIVE)
+  caloriesPerDay Int?
+  macroSplit     String? // JSON: {p:30, c:40, f:30}
+  instructions   String?
+  startDate      DateTime            @default(now())
+  endDate        DateTime?
+  patient        Patient             @relation(fields: [patientId], references: [id])
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  adherenceLogs  DietAdherenceLog[]
+
+  @@index([patientId])
+}
+
+model DietAdherenceLog {
+  id        String   @id @default(uuid())
+  planId    String
+  date      DateTime @db.Date
+  adhered   Boolean
+  userNotes String?
+  plan      DietPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId, date])
+}
+
+// --- Communication & Interaction ---
+
 model Message {
   id         String        @id @default(uuid())
   patientId  String
-  doctorId   String?
-  sender     MessageSender
-  contentEnc String // AES-256-GCM encrypted
-  mediaUrl   String? // S3 URL for image attachments
-  mediaType  String? // 'image/jpeg' | 'image/png'
+  senderId   String
+  threadType MessageThread
+  contentEnc String
   isRead     Boolean       @default(false)
   createdAt  DateTime      @default(now())
   patient    Patient       @relation(fields: [patientId], references: [id])
-  doctor     Doctor?       @relation(fields: [doctorId], references: [id])
 
   @@index([patientId, createdAt])
-  @@index([doctorId, isRead])
 }
 
-// Progress (weight loss only)
+model ConsultationNote {
+  id             String              @id @default(uuid())
+  patientId      String
+  professionalId String
+  type           ConsultNoteType     @default(SOAP)
+  contentEnc     String // Encrypted SOAP or follow-up notes
+  createdAt      DateTime            @default(now())
+  patient        Patient             @relation(fields: [patientId], references: [id])
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  videoSlot      VideoSlot?
+
+  @@index([patientId, createdAt])
+}
+
+model VideoSlot {
+  id                 String              @id @default(uuid())
+  professionalId     String
+  patientId          String?
+  startTime          DateTime
+  endTime            DateTime
+  isBooked           Boolean             @default(false)
+  consultationNoteId String?             @unique
+  professional       ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  consultationNote   ConsultationNote?   @relation(fields: [consultationNoteId], references: [id])
+
+  @@index([professionalId, startTime])
+}
+
+// --- Monitoring & Audit ---
+
 model ProgressEntry {
-  id         String   @id @default(uuid())
-  patientId  String
-  weightKg   Decimal
-  photoUrl   String? // S3 URL, optional
-  notes      String?
-  recordedAt DateTime @default(now())
-  patient    Patient  @relation(fields: [patientId], references: [id])
+  id                  String              @id @default(uuid())
+  patientId           String
+  weightKg            Decimal
+  notes               String?
+  dietitianAnnotation String?
+  enteredById         String // User ID of person who entered it
+  recordedAt          DateTime            @default(now())
+  patient             Patient             @relation(fields: [patientId], references: [id])
+  enteredBy           ProfessionalProfile @relation(fields: [enteredById], references: [id])
 
   @@index([patientId, recordedAt])
 }
 
-// Video Slots (weight loss consultations)
-model VideoSlot {
-  id           String    @id @default(uuid())
-  doctorId     String
-  patientId    String?
-  startTime    DateTime
-  endTime      DateTime
-  wherebyUrl   String? // Set when patient books
-  isBooked     Boolean   @default(false)
-  completedAt  DateTime?
-  consultNotes String? // Doctor fills post-session
-  doctor       Doctor    @relation(fields: [doctorId], references: [id])
-
-  @@index([doctorId, startTime])
-  @@index([isBooked, startTime])
-}
-
-// Payment Events
 model PaymentEvent {
   id             String       @id @default(uuid())
   subscriptionId String
   paystackRef    String       @unique
-  event          String // 'charge.success' | 'charge.failed' | etc.
+  event          String
   amount         Int
-  payload        String // Raw Paystack webhook JSON
+  payload        String
   processedAt    DateTime     @default(now())
   subscription   Subscription @relation(fields: [subscriptionId], references: [id])
 
   @@index([subscriptionId])
 }
 
-// Audit Log (immutable)
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String?
-  action     String // 'PRESCRIPTION_ISSUED' | 'PATIENT_DATA_ACCESSED' | etc.
-  entityType String? // 'Prescription' | 'Patient' | 'Order'
+  action     String
+  entityType String?
   entityId   String?
   ipAddress  String?
   userAgent  String?
-  metadata   String? // JSON extra context
+  metadata   String?
   createdAt  DateTime @default(now())
-  user       User?     @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@index([entityType, entityId])

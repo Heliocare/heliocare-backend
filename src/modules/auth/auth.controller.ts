@@ -146,4 +146,78 @@ export class AuthController {
       message: "Logged out successfully",
     });
   }
+
+  // Activate invited staff account
+  async activate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token, password } = req.body;
+      const result = await authService.activateAccount(token, password);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Export current user data
+  async exportMe(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await authService.exportData(req.user!.id);
+      res.status(200).json({ status: "success", data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Request account deletion
+  async deleteMe(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.requestDeletion(req.user!.id);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // MFA Setup: Generate Secret
+  async setupMfa(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.generateMfaSecret(req.user!.id);
+      res.status(200).json({ status: "success", data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // MFA Setup: Verify and Enable
+  async verifyAndEnableMfa(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.body;
+      const result = await authService.enableMfa(req.user!.id, token);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Request account unlock
+  async requestUnlock(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      const result = await authService.requestUnlock(email);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Unlock account
+  async unlockAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const token = req.params.token as string;
+      const result = await authService.unlockAccount(token);
+      res.status(200).json({ status: "success", ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

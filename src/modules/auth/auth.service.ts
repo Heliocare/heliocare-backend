@@ -4,6 +4,7 @@ import { JWT } from "../../utils/jwt.js";
 import { Email } from "../../utils/email.js";
 import { AppError } from "../../utils/AppError.js";
 import crypto from "node:crypto";
+import { generateSecret, generateURI, verify } from "otplib";
 import type { RegisterInput, LoginInput } from "./auth.schema.js";
 
 // Service class for Authentication business logic
@@ -39,6 +40,7 @@ export class AuthService {
               address: "",
               stateOfResidence: "",
               ndprConsentAt: new Date(),
+              marketingOptIn: data.marketingOptIn,
             },
           },
         },
@@ -60,7 +62,7 @@ export class AuthService {
       data: {
         userId: newUser.id,
         token: refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Patients always 7d at registration
       },
     });
 
@@ -81,7 +83,7 @@ export class AuthService {
   async login(data: LoginInput) {
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      include: { patient: true, doctor: true, pharmacist: true },
+      include: { patient: true, professionalProfile: true },
     });
 
     if (!user) {
@@ -100,23 +102,27 @@ export class AuthService {
       // Increment failed attempts
       const attempts = user.failedLoginAttempts + 1;
       const isLocking = attempts >= 10;
-      
+
       await prisma.user.update({
         where: { id: user.id },
         data: {
           failedLoginAttempts: attempts,
-          lockUntil: isLocking ? new Date(Date.now() + 30 * 60 * 1000) : null,
+          lockUntil: isLocking ? new Date(2099, 11, 31) : null, // Lock long-term if 10 failed attempts
         },
       });
 
       if (isLocking) {
-        throw new AppError("Account locked due to too many failed attempts. Try again in 30 minutes.", 403);
+        // Trigger account unlock email logic here in next step
+        throw new AppError("Account locked due to too many failed attempts. Please check your email to unlock your account.", 403);
       }
 
       throw new AppError("Invalid email or password", 401);
     }
 
     if (!user.isActive) {
+      if (user.professionalProfile?.status === "SUSPENDED") {
+        throw new AppError("Your professional account has been suspended. Please contact support.", 403);
+      }
       throw new AppError("Account is inactive", 403);
     }
 
@@ -134,19 +140,37 @@ export class AuthService {
       },
     });
 
+    // Handle MFA if enabled
+    if (user.mfaEnabled) {
+      if (!data.token) {
+        return {
+          mfaRequired: true,
+          userId: user.id,
+        };
+      }
+
+      const isMfaValid = await verify({ token: data.token, secret: user.mfaSecret as string });
+      if (!isMfaValid) {
+        throw new AppError("Invalid MFA token", 401);
+      }
+    }
+
     const accessToken = JWT.signAccess({ userId: user.id, role: user.role });
     const refreshToken = JWT.signRefresh({ userId: user.id, role: user.role });
+
+    const isProfessional = ["DOCTOR", "PHARMACIST", "LAB_SCIENTIST", "DIETITIAN", "ADMIN", "SUPER_ADMIN"].includes(user.role);
+    const refreshExpiry = isProfessional ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
 
     await prisma.refreshToken.upsert({
       where: { token: refreshToken },
       update: {
         token: refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + refreshExpiry),
       },
       create: {
         userId: user.id,
         token: refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + refreshExpiry),
       },
     });
 
@@ -156,8 +180,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         patientId: user.patient?.id,
-        doctorId: user.doctor?.id,
-        pharmacistId: user.pharmacist?.id,
+        professionalId: user.professionalProfile?.id,
         isEmailVerified: user.isEmailVerified,
       },
       accessToken,
@@ -295,11 +318,14 @@ export class AuthService {
     const accessToken = JWT.signAccess({ userId: user.id, role: user.role });
     const newRefreshToken = JWT.signRefresh({ userId: user.id, role: user.role });
 
+    const isProfessional = ["DOCTOR", "PHARMACIST", "LAB_SCIENTIST", "DIETITIAN", "ADMIN", "SUPER_ADMIN"].includes(user.role);
+    const refreshExpiry = isProfessional ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+
     await prisma.refreshToken.update({
       where: { id: savedToken.id },
       data: {
         token: newRefreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + refreshExpiry),
       },
     });
 
@@ -307,5 +333,163 @@ export class AuthService {
       accessToken,
       refreshToken: newRefreshToken,
     };
+  }
+
+  // Exports all data belonging to the user
+  async exportData(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        patient: {
+          include: {
+            intakes: true,
+            prescriptions: true,
+          },
+        },
+      },
+    });
+
+    if (!user) throw new AppError("User not found", 404);
+
+    // Filter sensitive fields before export
+    const { password, passwordResetToken, emailVerificationToken, ...safeData } = user;
+    return safeData;
+  }
+
+  // Flag account for deletion
+  async requestDeletion(userId: string) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+        // In a real system, we might set a 'scheduledForDeletionAt' date
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "ACCOUNT_DELETION_REQUESTED",
+        userId,
+        entityType: "User",
+        entityId: userId,
+      },
+    });
+
+    return { message: "Your account deletion request has been received and is being processed." };
+  }
+
+  // Request an unlock token via email
+  async requestUnlock(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return { message: "If your account is locked, an unlock link has been sent." };
+
+    if (!user.lockUntil || user.lockUntil < new Date()) {
+      return { message: "Account is not locked." };
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: token, // Reusing field for unlock token
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await Email.sendUnlockAccountEmail(user.email, token);
+
+    return { message: "If your account is locked, an unlock link has been sent." };
+  }
+
+  // Unlock account with token
+  async unlockAccount(token: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) throw new AppError("Invalid or expired unlock token", 400);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lockUntil: null,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    return { message: "Account unlocked successfully. You can now login." };
+  }
+
+  // Generate MFA secret
+  async generateMfaSecret(userId: string) {
+    const secret = generateSecret();
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError("User not found", 404);
+
+    const otpauthUrl = generateURI({
+      issuer: "Heliocare",
+      label: user.email,
+      secret,
+    });
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { mfaSecret: secret },
+    });
+
+    return { secret, otpauthUrl };
+  }
+
+  // Enable MFA after verification
+  async enableMfa(userId: string, token: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.mfaSecret) throw new AppError("User or MFA secret not found", 404);
+
+    const result = await verify({ token, secret: user.mfaSecret });
+    if (!result) throw new AppError("Invalid MFA token", 401);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { mfaEnabled: true },
+    });
+
+    return { message: "Multi-factor authentication enabled successfully." };
+  }
+
+  // Activate invited staff account
+  async activateAccount(token: string, password: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gt: new Date() },
+        isActive: false,
+      },
+    });
+
+    if (!user) {
+      throw new AppError("Invalid or expired invitation token", 400);
+    }
+
+    const hashedPassword = await Password.hash(password);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        isActive: true,
+        isEmailVerified: true, // Invitation acts as email verification
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    return { message: "Account activated successfully. You can now login." };
   }
 }

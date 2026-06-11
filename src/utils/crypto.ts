@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 // Used for securing sensitive medical data (Messaging and PII).
 export class Crypto {
   private static readonly ALGORITHM = "aes-256-gcm";
-  private static readonly KEY = Buffer.from(process.env.ENCRYPTION_KEY as any);
+  private static readonly KEY = Buffer.from(process.env.ENCRYPTION_KEY as string, "hex");
   private static readonly IV_LENGTH = 16;
 
   // Encrypts a plain text string.
