@@ -1,7 +1,13 @@
 import { sendWhatsAppTemplate } from "../whatsapp/sendTemplate.js";
 import { WA_TEMPLATES } from "../whatsapp/templates.js";
-import { sendEmailTemplate } from "../email/sendEmail.js";
-import { EMAIL_TEMPLATES } from "../email/templates.js";
+import {
+  sendVerifyEmail as sendVerifyEmailImpl,
+  sendPaymentReceipt as sendPaymentReceiptImpl,
+  sendPrescriptionReady as sendPrescriptionReadyImpl,
+  sendOrderDispatchedEmail as sendOrderDispatchedEmailImpl,
+  sendRenewalReceipt as sendRenewalReceiptImpl,
+  sendPasswordReset as sendPasswordResetImpl,
+} from "../email/index.js";
 
 // === WhatsApp Notifications ===
 
@@ -50,29 +56,26 @@ export const notifyPatientReassigned = async (phone: string, professionalName: s
 // === Email Notifications ===
 
 export const sendVerifyEmail = async (email: string, verificationUrl: string) => {
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.VERIFY_EMAIL, { verification_url: verificationUrl });
+    return sendVerifyEmailImpl(email, verificationUrl);
 };
 
 export const sendPaymentReceipt = async (email: string, data: { plan_name: string; amount_naira: string; date: string }) => {
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.PAYMENT_RECEIPT, data);
+    return sendPaymentReceiptImpl(email, data);
 };
 
 export const sendPrescriptionReady = async (email: string, doctorName: string, signedPdfUrl: string) => {
     // Never attach raw prescription PDF — always use signed S3 URL with 15 min TTL
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.PRESCRIPTION_READY, {
-        doctor_name: doctorName,
-        pdf_url: signedPdfUrl
-    });
+    return sendPrescriptionReadyImpl(email, doctorName, signedPdfUrl);
 };
 
 export const sendOrderDispatchedEmail = async (email: string, data: { tracking_number: string; logistics_partner: string; est_delivery: string }) => {
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.ORDER_DISPATCHED, data);
+    return sendOrderDispatchedEmailImpl(email, data);
 };
 
 export const sendRenewalReceipt = async (email: string, data: { amount_naira: string; next_billing_date: string }) => {
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.RENEWAL_RECEIPT, data);
+    return sendRenewalReceiptImpl(email, data);
 };
 
 export const sendPasswordReset = async (email: string, resetUrl: string) => {
-    return sendEmailTemplate(email, EMAIL_TEMPLATES.PASSWORD_RESET, { reset_url: resetUrl });
+    return sendPasswordResetImpl(email, resetUrl);
 };

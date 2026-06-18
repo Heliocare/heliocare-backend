@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import { Crypto } from "../../utils/crypto.js";
-import { Email } from "../../utils/email.js";
+import { sendDeletionConfirmation } from "../../lib/email/index.js";
 import { logger } from "../../lib/logger.js";
 import type { UserRole } from "../../generated/prisma/index.js";
 
@@ -552,7 +552,7 @@ export class PatientService {
 
     // Notify the patient via email
     try {
-      await Email.sendDeletionConfirmation(patient.user.email, thirtyDaysOut);
+      await sendDeletionConfirmation(patient.user.email, thirtyDaysOut);
     } catch (err) {
       logger.error({ err }, "Failed to send deletion confirmation email");
     }

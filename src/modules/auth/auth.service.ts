@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { Password } from "../../utils/password.js";
 import { JWT } from "../../utils/jwt.js";
-import { Email } from "../../utils/email.js";
+import { sendVerificationEmail, sendPasswordResetEmail, sendUnlockAccountEmail } from "../../lib/email/index.js";
 import { AppError } from "../../utils/AppError.js";
 import crypto from "node:crypto";
 import { generateSecret, generateURI, verify } from "otplib";
@@ -53,7 +53,7 @@ export class AuthService {
     });
 
     // Send verification email
-    await Email.sendVerificationEmail(newUser.email, verificationToken);
+    await sendVerificationEmail(newUser.email, verificationToken);
 
     const accessToken = JWT.signAccess({ userId: newUser.id, role: newUser.role });
     const refreshToken = JWT.signRefresh({ userId: newUser.id, role: newUser.role });
@@ -233,7 +233,7 @@ export class AuthService {
       },
     });
 
-    await Email.sendVerificationEmail(user.email, token);
+    await sendVerificationEmail(user.email, token);
 
     return { message: "Verification email sent" };
   }
@@ -260,7 +260,7 @@ export class AuthService {
       },
     });
 
-    await Email.sendPasswordResetEmail(user.email, token);
+    await sendPasswordResetEmail(user.email, token);
 
     return { message: "If an account with that email exists, a reset link has been sent." };
   }
@@ -398,7 +398,7 @@ export class AuthService {
       },
     });
 
-    await Email.sendUnlockAccountEmail(user.email, token);
+    await sendUnlockAccountEmail(user.email, token);
 
     return { message: "If your account is locked, an unlock link has been sent." };
   }

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { Email } from "../../utils/email.js";
+import { sendInvitationEmail } from "../../lib/email/index.js";
 import crypto from "node:crypto";
 import { RegBody, UserRole, ProfessionalStatus } from "../../generated/prisma/index.js";
 
@@ -58,7 +58,7 @@ export class AdminController {
       });
 
       // 4. Dispatch Invitation Email
-      await Email.sendInvitationEmail(email, invitationToken);
+      await sendInvitationEmail(email, invitationToken);
 
       res.status(200).json({
         status: "success",
