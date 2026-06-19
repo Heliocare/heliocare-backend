@@ -17,6 +17,7 @@ import orderRoutes from "./modules/orders/order.routes.js";
 import professionalRoutes from "./modules/professionals/professional.routes.js";
 import patientRoutes from "./modules/patients/patient.routes.js";
 import treatmentRoutes from "./modules/treatment/treatment.routes.js";
+import labRoutes from "./routes/lab.routes.js";
 
 import { ErrorMiddleware } from "./middleware/errorHandler.js";
 
@@ -89,6 +90,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/professionals", professionalRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/treatment", treatmentRoutes);
+app.use("/api/labs", labRoutes);
 
 // Global Error Handler
 app.use(ErrorMiddleware.handle);

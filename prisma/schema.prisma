@@ -219,6 +219,7 @@ model Patient {
   professionals     PatientProfessional[]
   messages          Message[]
   consultationNotes ConsultationNote[]
+  labOrders         LabOrder[]
 
   @@index([accountStatus])
 }
@@ -541,4 +542,33 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([entityType, entityId])
+}
+
+enum LabOrderStatus {
+  PENDING
+  DRAWN
+  RESULTED
+  CANCELLED
+}
+
+model LabOrder {
+  id            String         @id @default(uuid())
+  patientId     String
+  patient       Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  panelType     String
+  status        LabOrderStatus @default(PENDING)
+  requisitionId String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  results LabOrderResult[]
+}
+
+model LabOrderResult {
+  id            String   @id @default(uuid())
+  labOrderId    String
+  labOrder      LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
+  biomarkersEnc String
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
 }
